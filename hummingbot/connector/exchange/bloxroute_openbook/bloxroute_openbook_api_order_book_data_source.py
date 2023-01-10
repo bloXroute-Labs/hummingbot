@@ -77,6 +77,9 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource, ABC):
             raise
 
     async def _connected_websocket_assistant(self) -> WSAssistant:
+        """
+        Connects the WS Provider and returns an empty WS Assistant
+        """
         await self._ws_provider.connect()
         return WSAssistant()
 
@@ -112,9 +115,7 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource, ABC):
         raise Exception("Bloxroute Openbook does not use orderbook diffs")
 
     async def _process_websocket_messages(self, _: WSAssistant):
-        self._process_order_book_events_task = safe_ensure_future(
-            self._handle_order_book_updates()
-        )
+        self._handle_order_book_updates_promise = self._handle_order_book_updates()
 
     async def _handle_order_book_updates(self):
         orderbook_queue = self._message_queue[self._snapshot_messages_queue_key]
@@ -122,5 +123,5 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource, ABC):
             orderbook_queue.put_nowait(orderbook_event.to_dict(include_default_values=True))
 
     @property
-    async def process_order_book_events_task(self):
-        return self._process_order_book_events_task
+    async def handle_order_book_updates_promise(self):
+        return self._handle_order_book_updates_promise
