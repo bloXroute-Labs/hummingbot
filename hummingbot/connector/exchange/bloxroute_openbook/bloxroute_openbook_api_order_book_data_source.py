@@ -40,15 +40,13 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource, ABC):
 
     def validate_trading_pairs(self, trading_pairs):
         for trading_pair in trading_pairs:
-            if "-" not in trading_pair:
+            if len(trading_pair.split("-")) != 2:
                 raise Exception(f"trading pair ${trading_pair} does not have a dash between its two tokens")
 
     async def get_last_traded_prices(self,
                                      trading_pairs: List[str],
                                      domain: Optional[str] = None) -> Dict[str, float]:
-        price_response = await self._ws_provider.get_price()  # TODO we need to create an endpoint for trading_pairs
-        return price_response.to_dict()
-
+        raise Exception("Bloxroute Openbook does not use trade stream")
     async def _request_order_book_snapshot(self, trading_pair: str) -> Dict[str, Any]:
         """
         Retrieves a copy of the full order book from the exchange, for a particular trading pair.
