@@ -396,7 +396,7 @@ class AllConnectorSettings:
 
     @classmethod
     def get_connector_config_keys(cls, connector: str) -> Optional["BaseConnectorConfigMap"]:
-        with open("/Users/atulsrivastava/work/hummingbot/dict.txt", 'w') as f:
+        with open("/Users/ironman/GolandProjects/hummingbot/dict.txt", 'w') as f:
             for key, value in cls.get_connector_settings().items():
                 f.write('%s:%s\n' % (key, value))
         print("file written")

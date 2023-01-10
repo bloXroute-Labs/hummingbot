@@ -1,6 +1,3 @@
-import bxsolana_trader_proto.api as api
-
-from hummingbot.core.data_type.common import OrderType, TradeType
 from decimal import Decimal
 from typing import Any, Dict
 
