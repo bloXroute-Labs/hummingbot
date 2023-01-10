@@ -1,6 +1,5 @@
 from decimal import Decimal
-from decimal import Decimal
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from bxsolana.provider import WsProvider
 
@@ -9,8 +8,9 @@ from hummingbot.connector.exchange.bloxroute_openbook import (
     bloxroute_openbook_constants as CONSTANTS,
     bloxroute_openbook_web_utils as web_utils,
 )
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_order_book_data_source import \
-    BloxrouteOpenbookAPIOrderBookDataSource
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_order_book_data_source import (
+    BloxrouteOpenbookAPIOrderBookDataSource,
+)
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_auth import BloxrouteOpenbookAuth
 from hummingbot.connector.exchange_py_base import ExchangePyBase
 from hummingbot.connector.trading_rule import TradingRule
