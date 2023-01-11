@@ -4,11 +4,10 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from bidict import bidict
-from bxsolana.provider import WsProvider, GrpcProvider, grpc_testnet
+from bxsolana.provider import GrpcProvider, WsProvider, grpc_testnet
 from bxsolana.provider.constants import TESTNET_API_GRPC_HOST, TESTNET_API_GRPC_PORT, TESTNET_API_WS
-from bxsolana_trader_proto import GetMarketsResponse
+from bxsolana_trader_proto import GetMarketsResponse, api
 from bxsolana_trader_proto.api import GetAccountBalanceResponse, GetQuotesResponse, Market, TokenBalance
-from hummingbot.core.network_iterator import NetworkStatus
 
 from hummingbot.connector.constants import s_decimal_NaN
 from hummingbot.connector.exchange.bloxroute_openbook import (
@@ -35,9 +34,9 @@ from hummingbot.core.data_type.in_flight_order import InFlightOrder, OrderUpdate
 from hummingbot.core.data_type.order_book_tracker_data_source import OrderBookTrackerDataSource
 from hummingbot.core.data_type.trade_fee import AddedToCostTradeFee
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
-from hummingbot.core.web_assistant.web_assistants_factory import WebAssistantsFactory
+from hummingbot.core.network_iterator import NetworkStatus
 from hummingbot.core.utils.async_utils import safe_ensure_future
-from bxsolana_trader_proto import api
+from hummingbot.core.web_assistant.web_assistants_factory import WebAssistantsFactory
 
 if TYPE_CHECKING:
     from hummingbot.client.config.config_helpers import ClientConfigAdapter
