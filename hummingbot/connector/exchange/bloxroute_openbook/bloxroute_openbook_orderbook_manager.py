@@ -1,5 +1,5 @@
 import asyncio
-from typing import List, Dict
+from typing import Dict, List
 
 from bxsolana.provider import Provider
 from bxsolana_trader_proto.api import GetOrderbookResponse, OrderbookItem
