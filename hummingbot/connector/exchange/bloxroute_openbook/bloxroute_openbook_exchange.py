@@ -79,6 +79,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._sol_wallet_private_key = solana_wallet_private_key
         self._trading_required = trading_required
         self._trading_pairs = trading_pairs
+        self._server_response = GetServerTimeResponse
 
         self._ws_provider: WsProvider = WsProvider(auth_header=bloxroute_api_key, private_key=solana_wallet_private_key)
         asyncio.create_task(self.connect())
@@ -100,13 +101,11 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return "bloxroute-openbook"
 
     async def check_network(self) -> NetworkStatus:
-        server_response: GetServerTimeResponse = await self._ws_provider.get_server_time()
-        if server_response.timestamp:
+        self._server_response: GetServerTimeResponse = await self._ws_provider.get_server_time()
+        if self._server_response.timestamp:
             return NetworkStatus.CONNECTED
         else:
-            print("here")
-
-
+            return NetworkStatus.NOT_CONNECTED
     @property
     def status_dict(self) -> Dict[str, bool]:
         return {
