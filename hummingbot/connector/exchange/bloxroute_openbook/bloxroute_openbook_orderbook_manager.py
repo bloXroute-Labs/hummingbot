@@ -1,3 +1,4 @@
+import asyncio
 from typing import List, Dict
 
 from bxsolana.provider import Provider
@@ -42,6 +43,12 @@ class BloxrouteOpenbookOrderbookManager:
         self._provider = stream_provider
         self._trading_pairs = trading_pairs
         self._order_books: Dict[str, OrderbookInfo] = {}
+
+        self._order_book_polling_task = asyncio.create_task(self._start())
+
+    async def _start(self):
+        await self._initialize_order_books(self._trading_pairs)
+        asyncio.create_task(self._poll_order_book_updates(self._trading_pairs))  # TODO do we need to stop this?
 
     async def _initialize_order_books(self, trading_pairs: List[str]):
         for trading_pair in trading_pairs:
