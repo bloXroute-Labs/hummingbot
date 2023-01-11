@@ -100,7 +100,6 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource, ABC):
     async def _parse_trade_message(self, raw_message: Dict[str, Any], message_queue: asyncio.Queue):
         raise Exception("Bloxroute Openbook does not use trade updates")
 
-
     async def listen_for_order_book_diffs(self, ev_loop: asyncio.AbstractEventLoop, output: asyncio.Queue):
         raise Exception("Bloxroute Openbook does not use orderbook diffs")
 
