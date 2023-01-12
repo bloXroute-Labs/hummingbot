@@ -1,13 +1,11 @@
 import asyncio
 import time
-from abc import ABC
-from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, TYPE_CHECKING
 
-from bxsolana.provider import WsProvider
+from bxsolana.provider import GrpcProvider
 from bxsolana_trader_proto import GetOrderbookResponse, GetOrderbooksStreamResponse
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import BloxrouteOpenbookOrderBook
 from hummingbot.core.data_type.order_book_message import OrderBookMessage, OrderBookMessageType
 from hummingbot.core.data_type.order_book_tracker_data_source import OrderBookTrackerDataSource
 from hummingbot.core.web_assistant.ws_assistant import WSAssistant
@@ -24,10 +22,10 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     _logger: Optional[HummingbotLogger] = None
 
-    def __init__(self, ws_provider: WsProvider, trading_pairs: List[str], connector: 'BloxrouteOpenbookExchange'):
+    def __init__(self, provider: GrpcProvider, trading_pairs: List[str], connector: 'BloxrouteOpenbookExchange'):
         super().__init__(trading_pairs)
 
-        self._ws_provider = ws_provider
+        self._provider = provider
         self._connector = connector
         self._orderbook_stream: Optional[AsyncGenerator[GetOrderbooksStreamResponse, None]] = None
 
@@ -48,9 +46,9 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
         :return: the response from the exchange (JSON dictionary)
         """
-        orderbook: GetOrderbookResponse = await self._ws_provider.get_orderbook(market=trading_pair,
-                                                                                limit=1,
-                                                                                project=OPENBOOK_PROJECT)
+        orderbook: GetOrderbookResponse = await self._provider.get_orderbook(market=trading_pair,
+                                                                             limit=1,
+                                                                             project=OPENBOOK_PROJECT)
 
         snapshot_timestamp: float = time.time()
 
@@ -67,7 +65,7 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
         )
 
     async def _connected_websocket_assistant(self) -> WSAssistant:
-        await self._ws_provider.connect()
+        await self._provider.connect()
         return WSAssistant()
 
     async def _subscribe_channels(self, ws: WSAssistant):
