@@ -161,15 +161,15 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     @property
     def trading_rules_request_path(self):
-        raise Exception("Bloxroute Openbook does not use trading rules request path")
+        return CONSTANTS.MARKET_PATH
 
     @property
     def trading_pairs_request_path(self):
-        raise Exception("Bloxroute Openbook does not use trading pairs request path")
+        return CONSTANTS.MARKET_PATH
 
     @property
     def check_network_request_path(self):
-        raise Exception("Bloxroute Openbook does not use network request path")
+        pass
 
     @property
     def trading_pairs(self):
