@@ -92,9 +92,8 @@ class BloxrouteOpenbookOrderbookManager:
             self._apply_order_book_update(order_book_update.orderbook)
 
     def _apply_order_book_update(self, update: GetOrderbookResponse):
-        print("update")
-        best_ask = update.asks[-1]
-        best_bid = update.bids[0]
+        best_ask = update.asks[0]
+        best_bid = update.bids[-1]
 
         normalized_trading_pair = normalize_trading_pair(update.market)
         self._order_books[normalized_trading_pair] = OrderbookInfo(
