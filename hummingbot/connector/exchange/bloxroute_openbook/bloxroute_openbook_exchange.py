@@ -137,7 +137,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         }
 
     def get_price(self, trading_pair: str, is_buy: bool) -> Decimal:
-        print(self._order_book_manager.started, self._order_book_manager.is_ready)
+        self.logger().info(self._order_book_manager.started)
+        self.logger().info(self._order_book_manager.is_ready)
         if self._order_book_manager.is_ready:
             price, _ = self._order_book_manager.get_price_with_opportunity_size(trading_pair=trading_pair, is_buy=is_buy)
             return Decimal(price)

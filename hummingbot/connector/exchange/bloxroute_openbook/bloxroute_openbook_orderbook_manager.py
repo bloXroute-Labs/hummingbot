@@ -81,6 +81,7 @@ class BloxrouteOpenbookOrderbookManager:
             self._orderbook_polling_task = None
 
     async def _initialize_order_books(self):
+        await self._provider.connect()
         for trading_pair in self._trading_pairs:
             orderbook: GetOrderbookResponse = await self._provider.get_orderbook(market=trading_pair)
             self._apply_order_book_update(orderbook)
