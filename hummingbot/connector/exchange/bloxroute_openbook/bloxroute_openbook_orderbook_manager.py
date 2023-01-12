@@ -1,7 +1,7 @@
 import asyncio
 from typing import Dict, List
 
-from bxsolana.provider import Provider
+from bxsolana.provider import Provider, WsProvider
 from bxsolana_trader_proto.api import GetOrderbookResponse, OrderbookItem
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
@@ -41,6 +41,10 @@ class OrderbookInfo:
 class BloxrouteOpenbookOrderbookManager:
     def __init__(self, provider: Provider, trading_pairs: List[str]):
         self._provider = provider
+
+        for index, trading_pair in enumerate(trading_pairs):
+            trading_pairs[index] = normalize_trading_pair(trading_pair)
+
         self._trading_pairs = trading_pairs
         self._order_books: Dict[str, OrderbookInfo] = {}
         self._ready = asyncio.Event()
@@ -52,10 +56,12 @@ class BloxrouteOpenbookOrderbookManager:
         await self._ready.wait()
 
     async def _start(self):
-        await self._initialize_order_books(self._trading_pairs)
+        await self._initialize_order_books()
         self._ready.set()
 
-        self._orderbook_polling_task = asyncio.create_task(self._poll_order_book_updates(self._trading_pairs))  # TODO do we need to stop this?
+        self._orderbook_polling_task = asyncio.create_task(
+            self._poll_order_book_updates()
+        )
 
     async def stop(self):
         if self._orderbook_polling_task is not None:
@@ -66,22 +72,23 @@ class BloxrouteOpenbookOrderbookManager:
             self._start_task.cancel()
             self._start_task = None
 
-
-    async def _initialize_order_books(self, trading_pairs: List[str]):
-        for trading_pair in trading_pairs:
+    async def _initialize_order_books(self):
+        for trading_pair in self._trading_pairs:
             orderbook: GetOrderbookResponse = await self._provider.get_orderbook(market=trading_pair)
             self._apply_order_book_update(orderbook)
 
-    async def _poll_order_book_updates(self, trading_pairs: List[str]):
-        order_book_stream = self._provider.get_orderbooks_stream(markets=trading_pairs, project=OPENBOOK_PROJECT)
+    async def _poll_order_book_updates(self):
+        order_book_stream = self._provider.get_orderbooks_stream(markets=self._trading_pairs, project=OPENBOOK_PROJECT)
         async for order_book_update in order_book_stream:
             self._apply_order_book_update(order_book_update.orderbook)
 
     def _apply_order_book_update(self, update: GetOrderbookResponse):
+        print("update")
         best_ask = update.asks[-1]
         best_bid = update.bids[0]
 
-        self._order_books[update.market] = OrderbookInfo(
+        normalized_trading_pair = normalize_trading_pair(update.market)
+        self._order_books[normalized_trading_pair] = OrderbookInfo(
             best_ask_price=best_ask.price,
             best_ask_size=best_ask.size,
             best_bid_price=best_bid.price,
@@ -90,12 +97,23 @@ class BloxrouteOpenbookOrderbookManager:
         )
 
     def get_order_book(self, trading_pair: str) -> Orderbook:
-        return self._order_books[trading_pair].latest_order_book
+        normalized_trading_pair = normalize_trading_pair(trading_pair)
+        return self._order_books[normalized_trading_pair].latest_order_book
 
     def get_price_with_opportunity_size(self, trading_pair: str, is_buy: bool) -> (float, float):
-        ob_info = self._order_books[trading_pair]
+        normalized_trading_pair = normalize_trading_pair(trading_pair)
+        if normalized_trading_pair not in self._order_books:
+            raise Exception(f"order book manager does not support ${trading_pair}")
+
+        ob_info = self._order_books[normalized_trading_pair]
         return (
             (ob_info.best_bid_price, ob_info.best_bid_size)
             if is_buy
             else (ob_info.best_ask_price, ob_info.best_ask_size)
         )
+
+
+def normalize_trading_pair(trading_pair: str):
+    trading_pair = trading_pair.replace("-", "")
+    trading_pair = trading_pair.replace("/", "")
+    return trading_pair

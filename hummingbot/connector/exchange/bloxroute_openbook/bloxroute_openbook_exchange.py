@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from bidict import bidict
+from bxsolana import Provider
 from bxsolana.provider import GrpcProvider, WsProvider
 from bxsolana.provider.constants import TESTNET_API_GRPC_HOST, TESTNET_API_GRPC_PORT
 from bxsolana_trader_proto import GetMarketsResponse, api
@@ -86,21 +87,31 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
         self._server_response = GetServerTimeResponse
 
-        self._provider: GrpcProvider = GrpcProvider(auth_header=bloxroute_api_key, private_key=solana_wallet_private_key)
+        self._provider_1: Provider = WsProvider(auth_header=bloxroute_api_key, private_key=solana_wallet_private_key)
+        self._provider_2: Provider = WsProvider(auth_header=bloxroute_api_key, private_key=solana_wallet_private_key)
         asyncio.create_task(self.connect())
+
         self._trading_pairs = trading_pairs
         self._order_book_manager: BloxrouteOpenbookOrderbookManager = BloxrouteOpenbookOrderbookManager(
-            self._provider, self._trading_pairs
+            self._provider_2, self._trading_pairs
         )
+        self._order_book_manager_connected = False
+        asyncio.create_task(self.order_books_initialized())
 
         super().__init__(client_config_map)
         self.real_time_balance_update = False
 
     async def connect(self):
-        await self._provider.connect()
-        await self._order_book_manager.ready()
+        await self._provider_1.connect()
+        await self._provider_2.connect()
 
         print("connected!")
+
+    async def order_books_initialized(self):
+        await self._order_book_manager.ready()
+        self._order_book_manager_connected = True
+
+        print("order books initialized!")
 
     def authenticator(self):
         return BloxrouteOpenbookAuth(
@@ -112,7 +123,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return "bloxroute-openbook"
 
     async def check_network(self) -> NetworkStatus:
-        self._server_response: GetServerTimeResponse = await self._provider.get_server_time()
+        self._server_response: GetServerTimeResponse = await self._provider_1.get_server_time()
         if self._server_response.timestamp:
             return NetworkStatus.CONNECTED
         else:
@@ -126,8 +137,11 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         }
 
     def get_price(self, trading_pair: str, is_buy: bool) -> Decimal:
-        price, _ = self._order_book_manager.get_price_with_opportunity_size(trading_pair=trading_pair, is_buy=is_buy)
-        return Decimal(price)
+        if self._order_book_manager_connected:
+            price, _ = self._order_book_manager.get_price_with_opportunity_size(trading_pair=trading_pair, is_buy=is_buy)
+            return Decimal(price)
+        else:
+            return Decimal(-1)
 
     @property
     def rate_limits_rules(self):
@@ -186,7 +200,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     def _create_order_book_data_source(self) -> OrderBookTrackerDataSource:
         return BloxrouteOpenbookAPIOrderBookDataSource(
-            provider=self._provider, trading_pairs=self._trading_pairs, connector=self
+            provider=self._provider_1, trading_pairs=self._trading_pairs, connector=self
         )
 
     def _create_user_stream_data_source(self) -> UserStreamTrackerDataSource:
@@ -232,7 +246,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         side = api.Side.S_BID if trade_type == TradeType.BUY else api.Side.S_ASK
         type = api.OrderType.OT_LIMIT if order_type == OrderType.LIMIT else api.OrderType.OT_MARKET
 
-        submit_order_response = await self._provider.submit_order(
+        submit_order_response = await self._provider_1.submit_order(
             owner_address=self._sol_wallet_public_key,
             payer_address=self._sol_wallet_public_key,
             market=trading_pair,
@@ -249,7 +263,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     async def _place_cancel(self, order_id: str, tracked_order: InFlightOrder):
         side = api.Side.S_BID if tracked_order.trade_type == TradeType.BUY else api.Side.S_ASK
 
-        cancel_order_response = await self._provider.submit_cancel_order(
+        cancel_order_response = await self._provider_1.submit_cancel_order(
             order_i_d=order_id,
             side=side,
             market_address=tracked_order.trading_pair,
@@ -294,7 +308,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         pass
 
     async def _update_balances(self):
-        account_balance: GetAccountBalanceResponse = await self._provider.get_account_balance()
+        account_balance: GetAccountBalanceResponse = await self._provider_1.get_account_balance()
         for token_info in account_balance.tokens:
             self._account_balances[token_info.symbol] = token_info.wallet_amount + token_info.unsettled_amount
             self._account_available_balances[token_info.symbol] = token_info.wallet_amount
@@ -348,7 +362,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         in_token = split_token[0]
         out_token = split_token[1]
 
-        quotes_response: GetQuotesResponse = await self._provider.get_quotes(
+        quotes_response: GetQuotesResponse = await self._provider_1.get_quotes(
             in_token=in_token, out_token=out_token, in_amount=1, slippage=0.05, limit=1, projects=[OPENBOOK_PROJECT]
         )
         quotes = quotes_response.quotes[len(quotes_response.quotes) - 1]
@@ -356,7 +370,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return routes.out_amount  # this is the price
 
     async def _update_trading_rules(self):
-        markets_response: GetMarketsResponse = await self._provider.get_markets()
+        markets_response: GetMarketsResponse = await self._provider_1.get_markets()
         markets_by_name = markets_response.markets
 
         trading_rules_list = await self._format_trading_rules(markets_by_name)

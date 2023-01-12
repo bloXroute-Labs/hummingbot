@@ -2,7 +2,7 @@ import asyncio
 import time
 from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, List, Optional
 
-from bxsolana.provider import GrpcProvider
+from bxsolana import Provider
 from bxsolana_trader_proto import GetOrderbookResponse, GetOrderbooksStreamResponse
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
@@ -22,7 +22,7 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
 
     _logger: Optional[HummingbotLogger] = None
 
-    def __init__(self, provider: GrpcProvider, trading_pairs: List[str], connector: 'BloxrouteOpenbookExchange'):
+    def __init__(self, provider: Provider, trading_pairs: List[str], connector: 'BloxrouteOpenbookExchange'):
         super().__init__(trading_pairs)
 
         self._provider = provider

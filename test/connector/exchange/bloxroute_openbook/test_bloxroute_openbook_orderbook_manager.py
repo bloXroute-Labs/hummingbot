@@ -1,12 +1,15 @@
 import asyncio
 from collections.abc import AsyncGenerator
+from time import time
 from typing import List, Tuple
 from unittest.mock import AsyncMock, patch
 
 import aiounittest
 import bxsolana.provider.grpc
+from bxsolana.provider.constants import TESTNET_API_GRPC_HOST, TESTNET_API_GRPC_PORT
 from bxsolana_trader_proto import GetOrderbookResponse, GetOrderbooksStreamResponse, OrderbookItem
 
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_orderbook_manager import (
     BloxrouteOpenbookOrderbookManager,
 )
@@ -71,6 +74,18 @@ class TestOrderbookManager(aiounittest.AsyncTestCase):
 
         await ob_manager.stop()
 
+    async def test_run_get_server_time(self):
+        provider = bxsolana.provider.WsProvider(
+            auth_header="YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz",
+            private_key="3mvTYCLXLM3e2oucFQCtGbtR4bHkEDAJcSkq45mRVNuP7xtpvS5nGMBsHZYVRNHGqiktoBEBBdcvgGASU1DTodPM")
+
+        before = time()
+        await provider.connect()
+        # raise Exception(f"yeet {time() - before}")
+        st = await provider.get_server_time()
+        after = time()
+        ob = await provider.get_orderbook(market="SOLUSDC", project=OPENBOOK_PROJECT)
+        raise Exception(f"yeet {after - before}")
 
 def orders(price_and_sizes: List[Tuple[int, int]]) -> List[OrderbookItem]:
     orderbook_items = []
