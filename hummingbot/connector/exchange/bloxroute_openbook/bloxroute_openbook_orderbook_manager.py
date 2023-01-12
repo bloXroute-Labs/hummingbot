@@ -39,23 +39,21 @@ class OrderbookInfo:
 
 
 class BloxrouteOpenbookOrderbookManager:
-    def __init__(self, stream_provider: Provider, trading_pairs: List[str]):
-        self._provider = stream_provider
+    def __init__(self, provider: Provider, trading_pairs: List[str]):
+        self._provider = provider
         self._trading_pairs = trading_pairs
         self._order_books: Dict[str, OrderbookInfo] = {}
-        self._ready = False
+        self._ready = asyncio.Event()
 
         self._start_task = asyncio.create_task(self._start())
         self._orderbook_polling_task = None
 
-    @property
-    def ready(self):
-        return self._ready
+    async def ready(self):
+        await self._ready.wait()
 
     async def _start(self):
-        await self._provider.connect()
         await self._initialize_order_books(self._trading_pairs)
-        self._ready = True
+        self._ready.set()
 
         self._orderbook_polling_task = asyncio.create_task(self._poll_order_book_updates(self._trading_pairs))  # TODO do we need to stop this?
 
