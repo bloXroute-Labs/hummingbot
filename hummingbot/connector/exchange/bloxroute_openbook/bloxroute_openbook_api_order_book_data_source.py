@@ -1,7 +1,7 @@
 import asyncio
 import time
 from abc import ABC
-from typing import Any, AsyncGenerator, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, List, Optional
 
 from bxsolana.provider import WsProvider
 from bxsolana_trader_proto import GetOrderbookResponse, GetOrderbooksStreamResponse
@@ -34,7 +34,7 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def get_last_traded_prices(self,
                                      trading_pairs: List[str],
                                      domain: Optional[str] = None) -> Dict[str, float]:
-        return await self._connector.get_last_traded_prices(trading_pairs=trading_pairs)
+        raise
 
     async def _request_order_book_snapshots(self, output: asyncio.Queue):
         raise Exception("""this function is not needed for bloxroute_openbook data source
@@ -75,40 +75,22 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
         Subscribes to the trade events and diff orders events through the provided websocket connection.
         :param ws: the websocket assistant used to connect to the exchange
         """
-        try:
-            self._orderbook_stream = self._ws_provider.get_orderbooks_stream(markets=self._trading_pairs,
-                                                                             project=OPENBOOK_PROJECT)
-            self.logger().info("Subscribed to orderbook channel")
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            self.logger().error(
-                "Unexpected error occurred subscribing to order book trading and delta streams...",
-                exc_info=True
-            )
-            raise
+        raise
 
     def _channel_originating_message(self, event_message: Dict[str, Any]) -> str:
         raise Exception("Bloxroute Openbook does not use `_channel_originating_message`")
 
     async def _process_websocket_messages(self, _: WSAssistant):
-        orderbook_queue = self._message_queue[self._snapshot_messages_queue_key]
-        async for orderbook_event in self._orderbook_stream:
-            orderbook_queue.put_nowait(orderbook_event.to_dict(include_default_values=True))
+        raise
 
     async def _parse_order_book_snapshot_message(self, raw_message: Dict[str, Any], message_queue: asyncio.Queue):
-        order_book_message: OrderBookMessage = BloxrouteOpenbookOrderBook.snapshot_message_from_exchange(
-            raw_message,
-            time.time(),
-        )
-        message_queue.put_nowait(order_book_message)
+        raise
 
     async def _parse_order_book_diff_message(self, raw_message: Dict[str, Any], message_queue: asyncio.Queue):
         raise Exception("Bloxroute Openbook does not use orderbook diffs")
 
     async def _parse_trade_message(self, raw_message: Dict[str, Any], message_queue: asyncio.Queue):
         raise Exception("Bloxroute Openbook does not use trade updates")
-
 
     async def listen_for_order_book_diffs(self, ev_loop: asyncio.AbstractEventLoop, output: asyncio.Queue):
         raise Exception("Bloxroute Openbook does not use orderbook diffs")
@@ -117,4 +99,4 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
         raise Exception("Bloxroute Openbook does not use trades")
 
     async def _on_order_stream_interruption(self, websocket_assistant: Optional[WSAssistant] = None):
-        self._ws_provider and await self._ws_provider.close()
+        raise
