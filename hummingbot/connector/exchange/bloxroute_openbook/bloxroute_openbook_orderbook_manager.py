@@ -87,7 +87,8 @@ class BloxrouteOpenbookOrderbookManager:
             self._apply_order_book_update(orderbook)
 
     async def _poll_order_book_updates(self):
-        order_book_stream = self._provider.get_orderbooks_stream(markets=self._trading_pairs, project=OPENBOOK_PROJECT)
+        await self._provider.connect()
+        order_book_stream = self._provider.get_orderbooks_stream(markets=self._trading_pairs, limit=5, project=OPENBOOK_PROJECT)
         async for order_book_update in order_book_stream:
             self._apply_order_book_update(order_book_update.orderbook)
 
