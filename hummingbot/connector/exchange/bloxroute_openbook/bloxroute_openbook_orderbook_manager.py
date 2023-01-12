@@ -45,7 +45,8 @@ class BloxrouteOpenbookOrderbookManager:
         self._order_books: Dict[str, OrderbookInfo] = {}
         self._ready = False
 
-        self._order_book_polling_task = asyncio.create_task(self._start())
+        self._start_task = asyncio.create_task(self._start())
+        self._orderbook_polling_task = None
 
     @property
     def ready(self):
@@ -56,7 +57,17 @@ class BloxrouteOpenbookOrderbookManager:
         await self._initialize_order_books(self._trading_pairs)
         self._ready = True
 
-        asyncio.create_task(self._poll_order_book_updates(self._trading_pairs))  # TODO do we need to stop this?
+        self._orderbook_polling_task = asyncio.create_task(self._poll_order_book_updates(self._trading_pairs))  # TODO do we need to stop this?
+
+    async def stop(self):
+        if self._orderbook_polling_task is not None:
+            self._orderbook_polling_task.cancel()
+            self._orderbook_polling_task = None
+
+        if self._start_task is not None:
+            self._start_task.cancel()
+            self._start_task = None
+
 
     async def _initialize_order_books(self, trading_pairs: List[str]):
         for trading_pair in trading_pairs:

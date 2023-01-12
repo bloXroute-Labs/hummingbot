@@ -1,16 +1,15 @@
 import asyncio
 from collections.abc import AsyncGenerator
+from typing import List, Tuple
 from unittest.mock import AsyncMock, patch
 
 import aiounittest
 import bxsolana.provider.grpc
 from bxsolana_trader_proto import GetOrderbookResponse, GetOrderbooksStreamResponse, OrderbookItem
-from typing import List, Tuple
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_orderbook_manager import (
     BloxrouteOpenbookOrderbookManager,
 )
-
 
 class TestOrderbookManager(aiounittest.AsyncTestCase):
     @patch('bxsolana.provider.GrpcProvider.get_orderbook')
