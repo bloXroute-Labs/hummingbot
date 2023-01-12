@@ -19,8 +19,8 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_ord
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_auth import BloxrouteOpenbookAuth
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book_tracker import (
-    BloxrouteOpenbookOrderBookTracker,
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_orderbook_manager import (
+    BloxrouteOpenbookOrderbookManager,
 )
 
 # from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_utils import (
@@ -79,20 +79,31 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._sol_wallet_private_key = solana_wallet_private_key
         self._trading_required = trading_required
 
-        self._grpc_provider: GrpcProvider = GrpcProvider(host=TESTNET_API_GRPC_HOST, port=TESTNET_API_GRPC_PORT, auth_header=bloxroute_api_key, private_key=solana_wallet_private_key)
+        self._grpc_provider: GrpcProvider = GrpcProvider(
+            host=TESTNET_API_GRPC_HOST,
+            port=TESTNET_API_GRPC_PORT,
+            auth_header=bloxroute_api_key,
+            private_key=solana_wallet_private_key,
+        )
+        asyncio.create_task(self.connect())
 
         self._trading_pairs = trading_pairs
+        self._order_book_manager: BloxrouteOpenbookOrderbookManager = BloxrouteOpenbookOrderbookManager(
+            self._grpc_provider, self._trading_pairs
+        )
 
         super().__init__(client_config_map)
-        self.real_time_balance_update = True
+        self.real_time_balance_update = False
+
+    async def connect(self):
+        await self._grpc_provider.connect()
 
     async def check_network(self) -> NetworkStatus:
         """
         Checks connectivity with the exchange using the API
         """
         try:
-            await self._grpc_provider.connect()
-            await asyncio.wait_for(self._grpc_provider.get_server_time(), timeout=3)
+            await asyncio.wait_for(self._grpc_provider.get_server_time(), timeout=30)
         except Exception:
             return NetworkStatus.NOT_CONNECTED
         return NetworkStatus.CONNECTED
@@ -124,8 +135,12 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     @property
     def status_dict(self) -> Dict[str, bool]:
         return {
-            "order_books_initialized": self.order_book_tracker.ready,
+            "order_books_initialized": self._order_book_manager.ready,
         }
+
+    def get_price(self, trading_pair: str, is_buy: bool) -> Decimal:
+        price, _ = self._order_book_manager.get_price_with_opportunity_size(trading_pair=trading_pair, is_buy=is_buy)
+        return Decimal(price)
 
     @property
     def rate_limits_rules(self):
@@ -154,6 +169,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     @property
     def check_network_request_path(self):
         raise Exception("Bloxroute Openbook does not use network request path")
+
     @property
     def trading_pairs(self):
         return self._trading_pairs
@@ -183,12 +199,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     def _create_order_book_data_source(self) -> OrderBookTrackerDataSource:
         return BloxrouteOpenbookAPIOrderBookDataSource(
-            ws_provider=self._grpc_provider, trading_pairs=self._trading_pairs, connector=self
-        )
-
-    def _create_order_book_tracker(self):
-        return BloxrouteOpenbookOrderBookTracker(
-            data_source=self._create_order_book_data_source(), trading_pairs=self._trading_pairs, domain=self.domain
+            trading_pairs=self._trading_pairs
         )
 
     def _create_user_stream_data_source(self) -> UserStreamTrackerDataSource:
@@ -232,8 +243,6 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     ) -> Tuple[str, float]:
         raise Exception("place order not yet implemented")
 
-
-
     async def _place_cancel(self, order_id: str, tracked_order: InFlightOrder):
         raise Exception("place cancel not yet implemented")
 
@@ -244,8 +253,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             try:
                 quantity_precision = market.base_decimals
                 price_precision = market.quote_decimals
-                min_order_size = Decimal(str(10**-quantity_precision))
-                min_quote_amount = Decimal(str(10**-price_precision))
+                min_order_size = Decimal(str(10 ** -quantity_precision))
+                min_quote_amount = Decimal(str(10 ** -price_precision))
                 trading_rules.append(
                     TradingRule(
                         trading_pair=market_name,

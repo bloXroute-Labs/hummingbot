@@ -43,11 +43,19 @@ class BloxrouteOpenbookOrderbookManager:
         self._provider = stream_provider
         self._trading_pairs = trading_pairs
         self._order_books: Dict[str, OrderbookInfo] = {}
+        self._ready = False
 
         self._order_book_polling_task = asyncio.create_task(self._start())
 
+    @property
+    def ready(self):
+        return self._ready
+
     async def _start(self):
+        await self._provider.connect()
         await self._initialize_order_books(self._trading_pairs)
+        self._ready = True
+
         asyncio.create_task(self._poll_order_book_updates(self._trading_pairs))  # TODO do we need to stop this?
 
     async def _initialize_order_books(self, trading_pairs: List[str]):
@@ -75,10 +83,10 @@ class BloxrouteOpenbookOrderbookManager:
     def get_order_book(self, trading_pair: str) -> Orderbook:
         return self._order_books[trading_pair].latest_order_book
 
-    def get_price_with_opportunity_size(self, trading_pair: str, is_bid: bool) -> (float, float):
+    def get_price_with_opportunity_size(self, trading_pair: str, is_buy: bool) -> (float, float):
         ob_info = self._order_books[trading_pair]
         return (
             (ob_info.best_bid_price, ob_info.best_bid_size)
-            if is_bid
+            if is_buy
             else (ob_info.best_ask_price, ob_info.best_ask_size)
         )
