@@ -91,6 +91,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     async def connect(self):
         await self._ws_provider.connect()
 
+        print("connected!")
+
     def authenticator(self):
         return BloxrouteOpenbookAuth(
             api_key=self._auth_header, secret_key=self._sol_wallet_private_key, time_provider=self._time_synchronizer
@@ -241,24 +243,26 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         trading_rules = []
         for market_name in markets_by_name:
             market = markets_by_name[market_name]
-            try:
-                quantity_precision = market.base_decimals
-                price_precision = market.quote_decimals
-                min_order_size = Decimal(str(10**-quantity_precision))
-                min_quote_amount = Decimal(str(10**-price_precision))
-                trading_rules.append(
-                    TradingRule(
-                        trading_pair=market_name,
-                        min_order_size=min_order_size,
-                        min_order_value=min_order_size * min_quote_amount,
-                        max_price_significant_digits=Decimal(str(price_precision)),
-                        min_base_amount_increment=min_order_size,
-                        min_quote_amount_increment=min_quote_amount,
-                        min_price_increment=min_quote_amount,
+
+            tokens = market.market.split("/")
+            trading_pair = f"{tokens[0]}-{tokens[1]}"
+
+            quantity_precision = market.base_decimals
+            price_precision = market.quote_decimals
+            min_order_size = Decimal(str(10**-quantity_precision))
+            min_quote_amount = Decimal(str(10**-price_precision))
+            trading_rules.append(
+                TradingRule(
+                    trading_pair=trading_pair,
+                    min_order_size=min_order_size,
+                    min_order_value=min_order_size * min_quote_amount,
+                    max_price_significant_digits=Decimal(str(price_precision)),
+                    min_base_amount_increment=min_order_size,
+                    min_quote_amount_increment=min_quote_amount,
+                    min_price_increment=min_quote_amount,
                     )
                 )
-            except Exception as e:
-                raise Exception(f"Error parsing the trading pair rule {market.to_dict()}: {e}")
+
         return trading_rules
 
     async def _update_trading_fees(self):
@@ -299,10 +303,13 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         mapping = bidict()
 
         for market_name in markets_by_name:
-            tokens = market_name.split("/")
+            # format is 1SP/USDC-P_OPENBOOK
+
+            token_pair = market_name.split("-")
+            tokens = token_pair[0].split("/")
             base = tokens[0]
             quote = tokens[1]
-            trading_pair = f"{base}-{quote}"
+            trading_pair = f"{base}/{quote}"
 
             mapping[market_name] = trading_pair
 

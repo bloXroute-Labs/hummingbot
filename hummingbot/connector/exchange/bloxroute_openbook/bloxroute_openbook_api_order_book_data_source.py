@@ -8,7 +8,7 @@ from bxsolana_trader_proto import GetOrderbookResponse, GetOrderbooksStreamRespo
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import BloxrouteOpenbookOrderBook
-from hummingbot.core.data_type.order_book_message import OrderBookMessage
+from hummingbot.core.data_type.order_book_message import OrderBookMessage, OrderBookMessageType
 from hummingbot.core.data_type.order_book_tracker_data_source import OrderBookTrackerDataSource
 from hummingbot.core.web_assistant.ws_assistant import WSAssistant
 from hummingbot.logger import HummingbotLogger
@@ -37,8 +37,8 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
         return await self._connector.get_last_traded_prices(trading_pairs=trading_pairs)
 
     async def _request_order_book_snapshots(self, output: asyncio.Queue):
-        for trading_pair in self._trading_pairs:
-            output.put_nowait(await self._order_book_snapshot(trading_pair))
+        raise Exception("""this function is not needed for bloxroute_openbook data source
+                           the request is handled in the _order_book_snapshot func""")
 
     async def _order_book_snapshot(self, trading_pair: str) -> OrderBookMessage:
         """
@@ -49,21 +49,22 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
         :return: the response from the exchange (JSON dictionary)
         """
         orderbook: GetOrderbookResponse = await self._ws_provider.get_orderbook(market=trading_pair,
-                                                                                limit=10,
+                                                                                limit=1,
                                                                                 project=OPENBOOK_PROJECT)
+
+        snapshot_timestamp: float = time.time()
+
         order_book_message_content = {
             "trading_pair": trading_pair,
             "update_id": int(time.time()),
             "bids": [(bid.price, bid.size) for bid in orderbook.bids],
             "asks": [(ask.price, ask.size) for ask in orderbook.asks]
         }
-        snapshot_msg: OrderBookMessage = OrderBookMessage(
-            type=OrderBookMessage.SNAPSHOT,
-            content=order_book_message_content,
-            timestamp=time.time()
+        return OrderBookMessage(
+            OrderBookMessageType.SNAPSHOT,
+            order_book_message_content,
+            snapshot_timestamp
         )
-
-        return snapshot_msg
 
     async def _connected_websocket_assistant(self) -> WSAssistant:
         await self._ws_provider.connect()
