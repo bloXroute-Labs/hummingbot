@@ -173,10 +173,10 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             ws_provider=self._ws_provider, trading_pairs=self._trading_pairs, connector=self
         )
 
-    def _create_order_book_tracker(self):
-        return BloxrouteOpenbookOrderBookTracker(
-            data_source=self._create_order_book_data_source(), trading_pairs=self._trading_pairs, domain=self.domain
-        )
+    # def _create_order_book_tracker(self):
+    #     return BloxrouteOpenbookOrderBookTracker(
+    #         data_source=self._create_order_book_data_source(), trading_pairs=self._trading_pairs, domain=self.domain
+    #     )
 
     def _create_user_stream_data_source(self) -> UserStreamTrackerDataSource:
         raise NotImplementedError
