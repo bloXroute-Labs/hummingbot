@@ -96,7 +96,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             self._provider_2, self._trading_pairs
         )
         self._order_book_manager_connected = False
-        asyncio.create_task(self.order_books_initialized())
+        asyncio.create_task(self.initialize_order_books())
 
         super().__init__(client_config_map)
         self.real_time_balance_update = False
@@ -107,8 +107,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
         print("connected!")
 
-    async def order_books_initialized(self):
-        await self._order_book_manager.ready()
+    async def initialize_order_books(self):
+        await self._order_book_manager.start()
         self._order_book_manager_connected = True
 
         print("order books initialized!")
@@ -137,11 +137,14 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         }
 
     def get_price(self, trading_pair: str, is_buy: bool) -> Decimal:
-        if self._order_book_manager_connected:
+        print(self._order_book_manager.started, self._order_book_manager.is_ready)
+        if self._order_book_manager.is_ready:
             price, _ = self._order_book_manager.get_price_with_opportunity_size(trading_pair=trading_pair, is_buy=is_buy)
             return Decimal(price)
         else:
-            return Decimal(-1)
+            if not self._order_book_manager.started:
+                asyncio.create_task(self.initialize_order_books())
+            return Decimal(0)
 
     @property
     def rate_limits_rules(self):
