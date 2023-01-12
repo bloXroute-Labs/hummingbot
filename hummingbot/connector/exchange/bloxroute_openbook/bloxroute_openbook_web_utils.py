@@ -1,6 +1,8 @@
 from typing import Callable, Optional
 from urllib.parse import urljoin
 
+import bxsolana
+
 import hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants as CONSTANTS
 from hummingbot.connector.time_synchronizer import TimeSynchronizer
 from hummingbot.connector.utils import GZipCompressionWSPostProcessor, TimeSynchronizerRESTPreProcessor
@@ -16,20 +18,21 @@ def public_rest_url(path_url: str, domain: str = CONSTANTS.DEFAULT_DOMAIN) -> st
     :param domain: not required for CI-EX. Added only for compatibility.
     :return: the full URL to the endpoint
     """
-    return urljoin(CONSTANTS.CIEX_BASE_URL, path_url)
+    return urljoin(CONSTANTS.REST_URL, path_url)
 
 
 def private_rest_url(path_url: str, domain: str = CONSTANTS.DEFAULT_DOMAIN) -> str:
     return public_rest_url(path_url, domain)
 
 def build_api_factory(
+        provider: bxsolana.Provider,
         throttler: Optional[AsyncThrottler] = None,
         time_synchronizer: Optional[TimeSynchronizer] = None,
         time_provider: Optional[Callable] = None,
         auth: Optional[AuthBase] = None, ) -> WebAssistantsFactory:
     throttler = throttler or create_throttler()
     time_synchronizer = time_synchronizer or TimeSynchronizer()
-    time_provider = time_provider or (lambda: get_current_server_time(throttler=throttler))
+    time_provider = time_provider
     api_factory = WebAssistantsFactory(
         throttler=throttler,
         auth=auth,

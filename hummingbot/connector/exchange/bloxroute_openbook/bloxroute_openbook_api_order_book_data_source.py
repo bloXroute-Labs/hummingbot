@@ -36,10 +36,6 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
                                      domain: Optional[str] = None) -> Dict[str, float]:
         return await self._connector.get_last_traded_prices(trading_pairs=trading_pairs)
 
-    async def _request_order_book_snapshots(self, output: asyncio.Queue):
-        raise Exception("""this function is not needed for bloxroute_openbook data source
-                           the request is handled in the _order_book_snapshot func""")
-
     async def _order_book_snapshot(self, trading_pair: str) -> OrderBookMessage:
         """
         Retrieves a copy of the full order book from the exchange, for a particular trading pair.
@@ -109,12 +105,31 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def _parse_trade_message(self, raw_message: Dict[str, Any], message_queue: asyncio.Queue):
         raise Exception("Bloxroute Openbook does not use trade updates")
 
+    async def _parse_order_book_message(
+            self,
+            raw_message: Dict[str, Any],
+            message_queue: asyncio.Queue,
+            message_type: OrderBookMessageType):
+        diff_data: Dict[str, Any] = raw_message["tick"]
+        symbol = raw_message["channel"].split("_")[1]
+        timestamp: float = raw_message["ts"] * 1e-3
+        update_id: int = int(raw_message["ts"])
 
-    async def listen_for_order_book_diffs(self, ev_loop: asyncio.AbstractEventLoop, output: asyncio.Queue):
-        raise Exception("Bloxroute Openbook does not use orderbook diffs")
+        trading_pair = await self._connector.trading_pair_associated_to_exchange_symbol(symbol=symbol)
 
-    async def listen_for_trades(self, ev_loop: asyncio.AbstractEventLoop, output: asyncio.Queue):
-        raise Exception("Bloxroute Openbook does not use trades")
+        order_book_message_content = {
+            "trading_pair": trading_pair,
+            "update_id": update_id,
+            "bids": [(price, amount) for price, amount in diff_data.get("buys", [])],
+            "asks": [(price, amount) for price, amount in diff_data.get("asks", [])],
+        }
+        diff_message: OrderBookMessage = OrderBookMessage(
+            message_type,
+            order_book_message_content,
+            timestamp)
+
+        message_queue.put_nowait(diff_message)
+
 
     async def _on_order_stream_interruption(self, websocket_assistant: Optional[WSAssistant] = None):
         self._ws_provider and await self._ws_provider.close()

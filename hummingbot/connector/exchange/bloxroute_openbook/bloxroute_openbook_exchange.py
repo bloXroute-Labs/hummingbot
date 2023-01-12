@@ -156,11 +156,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return self._trading_required
 
     def supported_order_types(self) -> List[OrderType]:
-        """
-        :return a list of OrderType supported by this connector.
-        Note that Market order type is no longer required and will not be used.
-        """
-        raise Exception("not yet implemented")
+        return [OrderType.LIMIT, OrderType.MARKET]
 
     def _is_request_exception_related_to_time_synchronizer(self, request_exception: Exception):
         raise Exception("not yet implemented")
@@ -223,18 +219,18 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         side = api.Side.S_BID if trade_type == TradeType.BUY else api.Side.S_ASK
         type = api.OrderType.OT_LIMIT if order_type == OrderType.LIMIT else api.OrderType.OT_MARKET
 
-        submit_order_response = await self._ws_provider.submit_order(
+        submit_order_response = await self._ws_provider.post_order(
             owner_address=self._sol_wallet_public_key,
             payer_address=self._sol_wallet_public_key,
             market=trading_pair,
             side=side,
-            types=[type],
+            type=[type],
             amount=float(amount),
             price=float(price),
             project=OPENBOOK_PROJECT,
-            skip_pre_flight=True,
         )
 
+        return (submit_order_response.open_orders_address,
 
     async def _place_cancel(self, order_id: str, tracked_order: InFlightOrder):
         raise Exception("place cancel not yet implemented")
