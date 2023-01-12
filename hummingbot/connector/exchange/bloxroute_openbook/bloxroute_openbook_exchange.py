@@ -102,11 +102,10 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         """
         Checks connectivity with the exchange using the API
         """
-        try:
-            await asyncio.wait_for(self._grpc_provider.get_server_time(), timeout=30)
-        except Exception:
-            return NetworkStatus.NOT_CONNECTED
-        return NetworkStatus.CONNECTED
+        server_time = await self._grpc_provider.get_server_time()
+        if server_time.timestamp:
+            return NetworkStatus.CONNECTED
+        return NetworkStatus.NOT_CONNECTED
 
     def authenticator(self):
         return BloxrouteOpenbookAuth(

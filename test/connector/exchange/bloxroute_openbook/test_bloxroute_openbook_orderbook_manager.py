@@ -11,6 +11,7 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_orderbo
     BloxrouteOpenbookOrderbookManager,
 )
 
+
 class TestOrderbookManager(aiounittest.AsyncTestCase):
     @patch('bxsolana.provider.GrpcProvider.get_orderbook')
     async def test_initalize_orderbook(self, mock: AsyncMock):
