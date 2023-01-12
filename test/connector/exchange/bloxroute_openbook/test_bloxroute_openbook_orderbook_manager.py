@@ -27,9 +27,7 @@ class TestOrderbookManager(aiounittest.AsyncTestCase):
         )
 
         ob_manager = BloxrouteOpenbookOrderbookManager(provider, ["SOLUSDC"])
-        await asyncio.sleep(0.1)
-
-        self.assertEqual(ob_manager.ready, True)
+        await ob_manager.ready()
 
         ob = ob_manager.get_order_book("SOLUSDC")
         self.assertListEqual(bids, ob.bids)
@@ -61,9 +59,8 @@ class TestOrderbookManager(aiounittest.AsyncTestCase):
         orderbook_stream_mock.return_value = async_generator("SOLUSDC", new_bids, new_asks)
 
         ob_manager = BloxrouteOpenbookOrderbookManager(provider, ["SOLUSDC"])
+        await ob_manager.ready()
         await asyncio.sleep(0.1)
-
-        self.assertEqual(ob_manager.ready, True)
 
         ob = ob_manager.get_order_book("SOLUSDC")
         self.assertListEqual(new_bids, ob.bids)
