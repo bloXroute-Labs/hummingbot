@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import Any, AsyncGenerator, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, List, Optional
 
 from bxsolana.provider import GrpcProvider
 from bxsolana_trader_proto import GetOrderbookResponse, GetOrderbooksStreamResponse

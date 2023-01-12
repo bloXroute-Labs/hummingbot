@@ -97,7 +97,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self.real_time_balance_update = False
 
     async def connect(self):
-        await self._grpc_provider.connect()
+        await self._provider.connect()
+        await self._order_book_manager.ready()
 
         print("connected!")
 
