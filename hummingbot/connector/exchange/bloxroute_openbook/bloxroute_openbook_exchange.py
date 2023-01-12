@@ -138,7 +138,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     def get_price(self, trading_pair: str, is_buy: bool) -> Decimal:
         if self._order_book_manager.is_ready:
-            price, _ = self._order_book_manager.get_price_with_opportunity_size(trading_pair=trading_pair, is_buy=is_buy)
+            price, _ = self._order_book_manager.get_price_with_opportunity_size(trading_pair=trading_pair,
+                                                                                is_buy=is_buy)
             return Decimal(price)
         else:
             if not self._order_book_manager.started:
@@ -302,6 +303,20 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
         return trading_rules
 
+    def get_order_price_quantum(self, trading_pair: str, price: Decimal):
+        """
+        Returns a price step, a minimum price increment for a given trading pair.
+        """
+        trading_rule = self._trading_rules[trading_pair]
+        return trading_rule.min_price_increment
+
+    def get_order_size_quantum(self, trading_pair: str, price: Decimal):
+        """
+        Returns an order amount step, a minimum amount increment for a given trading pair.
+        """
+        trading_rule = self._trading_rules[trading_pair]
+        return trading_rule.min_base_amount_increment
+
     async def _update_trading_fees(self):
         """
         Update fees information from the exchange
@@ -367,8 +382,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         quotes_response: GetQuotesResponse = await self._provider_1.get_quotes(
             in_token=in_token, out_token=out_token, in_amount=1, slippage=0.05, limit=1, projects=[OPENBOOK_PROJECT]
         )
-        quotes = quotes_response.quotes[len(quotes_response.quotes) - 1]
-        routes = quotes.routes[len(quotes.routes) - 1]
+        quotes = quotes_response.quotes[-1]
+        routes = quotes.routes[-1]
         return routes.out_amount  # this is the price
 
     async def _update_trading_rules(self):

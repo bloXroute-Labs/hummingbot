@@ -97,13 +97,29 @@ class BloxrouteOpenbookOrderbookManager:
         best_bid = update.bids[-1]
 
         normalized_trading_pair = normalize_trading_pair(update.market)
-        self._order_books[normalized_trading_pair] = OrderbookInfo(
-            best_ask_price=best_ask.price,
-            best_ask_size=best_ask.size,
-            best_bid_price=best_bid.price,
-            best_bid_size=best_bid.size,
-            latest_order_book=Orderbook(update.asks, update.bids),
-        )
+
+        best_ask_price = best_ask.price
+        best_ask_size = best_ask.size
+        best_bid_price = best_bid.price
+        best_bid_size = best_bid.size
+        latest_order_book = Orderbook(update.asks, update.bids)
+
+        if normalized_trading_pair not in self._order_books:
+            self._order_books[normalized_trading_pair] = OrderbookInfo(
+                best_ask_price=best_ask_price,
+                best_ask_size=best_ask_size,
+                best_bid_price=best_bid_price,
+                best_bid_size=best_bid_size,
+                latest_order_book=latest_order_book,
+            )
+        else:
+            ob_info = self._order_books[normalized_trading_pair]
+
+            ob_info.best_ask_price = best_ask_price
+            ob_info.best_ask_size = best_ask_size
+            ob_info.best_bid_price = best_bid_price
+            ob_info.best_bid_size = best_bid_size
+            ob_info.latest_order_book = latest_order_book
 
     def get_order_book(self, trading_pair: str) -> Orderbook:
         normalized_trading_pair = normalize_trading_pair(trading_pair)
