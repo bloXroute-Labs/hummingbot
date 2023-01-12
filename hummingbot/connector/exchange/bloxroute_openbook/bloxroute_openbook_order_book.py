@@ -38,8 +38,11 @@ class BloxrouteOpenbookOrderBook(OrderBook):
 
 
 def orders_to_orderbook_rows(orders: List[OrderbookItem]) -> List[OrderBookRow]:
+    orderbook_rows = []
     for order in orders:
-        yield order_to_orderbook_row(order)
+        orderbook_rows.append(order_to_orderbook_row(order))
+
+    return orderbook_rows
 
 
 def order_to_orderbook_row(order: OrderbookItem) -> OrderBookRow:
