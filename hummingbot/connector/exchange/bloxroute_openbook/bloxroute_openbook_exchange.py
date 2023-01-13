@@ -256,12 +256,13 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
         # this is temporarily hard coded to a single solana wallet
 
-        base_addr = CONSTANTS.TOKENPAIRTOWALLETADDR[base]
-        quote_addr = CONSTANTS.TOKENPAIRTOWALLETADDR[quote]
+        base_addr = CONSTANTS.TOKEN_PAIR_TO_WALLET_ADDR[base]
+        quote_addr = CONSTANTS.TOKEN_PAIR_TO_WALLET_ADDR[quote]
+        payer_address = base_addr if side == api.Side.S_ASK else quote_addr
 
         submit_order_response = await self._provider_1.submit_order(
-            owner_address=base_addr,
-            payer_address=quote_addr,
+            owner_address=self._sol_wallet_public_key,
+            payer_address=payer_address,
             market=trading_pair,
             side=side,
             types=[type],
@@ -353,6 +354,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         raise Exception("all trade updates for order not yet implemented")
 
     async def _request_order_status(self, tracked_order: InFlightOrder) -> OrderUpdate:
+        raise Exception("request_order_status not implemented")
 
     def _create_order_fill_updates(self, order: InFlightOrder, fill_update: Dict[str, Any]) -> List[TradeUpdate]:
         raise Exception("create order fill updates not yet implemented")
