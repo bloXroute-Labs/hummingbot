@@ -6,12 +6,12 @@ from unittest.mock import AsyncMock, patch
 import aiounittest
 import bxsolana.provider.grpc
 from bxsolana_trader_proto import (
-    GetOrderStatusResponse,
-    GetOrderStatusStreamResponse,
     GetOrderbookResponse,
     GetOrderbooksStreamResponse,
-    OrderStatus,
+    GetOrderStatusResponse,
+    GetOrderStatusStreamResponse,
     OrderbookItem,
+    OrderStatus,
     Side,
 )
 
