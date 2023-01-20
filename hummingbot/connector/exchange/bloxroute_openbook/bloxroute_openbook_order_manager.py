@@ -56,15 +56,16 @@ class OrderStatusInfo:
     client_order_i_d: int
     timestamp: float
 
-    def __init__(self,
-                 order_status: OrderStatus,
-                 quantity_released: float,
-                 quantity_remaining: float,
-                 side: Side,
-                 fill_price: float,
-                 client_order_i_d: int,
-                 timestamp: float,
-                 ):
+    def __init__(
+        self,
+        order_status: OrderStatus,
+        quantity_released: float,
+        quantity_remaining: float,
+        side: Side,
+        fill_price: float,
+        client_order_i_d: int,
+        timestamp: float,
+    ):
         self.order_status = order_status
         self.quantity_released = quantity_released
         self.quantity_remaining = quantity_remaining
@@ -84,7 +85,7 @@ class BloxrouteOpenbookOrderManager:
         self._trading_pairs = trading_pairs
 
         self._order_books: Dict[str, OrderbookInfo] = {}
-        self._markets_to_order_statuses: Dict[str, Dict[int, OrderStatusInfo]] = {}
+        self._markets_to_order_statuses: Dict[str, Dict[int, List[OrderStatusInfo]]] = {}
 
         self._started = False
         self._ready = asyncio.Event()
@@ -145,7 +146,8 @@ class BloxrouteOpenbookOrderManager:
             self._markets_to_order_statuses.update({normalized_trading_pair: {}})
 
             initialize_order_stream_task = asyncio.create_task(
-                self._initialize_order_status_stream(trading_pair=trading_pair))
+                self._initialize_order_status_stream(trading_pair=trading_pair)
+            )
             self._order_status_running_tasks.append(initialize_order_stream_task)
 
     async def _initialize_order_status_stream(self, trading_pair: str):
@@ -204,15 +206,19 @@ class BloxrouteOpenbookOrderManager:
             raise Exception(f"order manager does not support updates for ${normalized_trading_pair}")
 
         order_statuses = self._markets_to_order_statuses[normalized_trading_pair]
-        order_statuses.update({os_update.client_order_i_d: OrderStatusInfo(
+        order_status_info = OrderStatusInfo(
             order_status=os_update.order_status,
             quantity_released=os_update.quantity_released,
             quantity_remaining=os_update.quantity_remaining,
             side=os_update.side,
             fill_price=os_update.fill_price,
             client_order_i_d=os_update.client_order_i_d,
-            timestamp=time()
-        )})
+            timestamp=time(),
+        )
+        if os_update.client_order_i_d in order_statuses:
+            order_statuses[os_update.client_order_i_d].append(order_status_info)
+        else:
+            order_statuses[os_update.client_order_i_d] = [order_status_info]
 
     def get_order_book(self, trading_pair: str) -> Orderbook:
         normalized_trading_pair = normalize_trading_pair(trading_pair)
@@ -233,7 +239,7 @@ class BloxrouteOpenbookOrderManager:
             else (ob_info.best_ask_price, ob_info.best_ask_size)
         )
 
-    def get_order_status(self, trading_pair: str, client_order_id: int) -> OrderStatusInfo:
+    def get_order_status(self, trading_pair: str, client_order_id: int) -> List[OrderStatusInfo]:
         normalized_trading_pair = normalize_trading_pair(trading_pair)
         if normalized_trading_pair not in self._markets_to_order_statuses:
             raise Exception(f"order book manager does not support ${trading_pair}")
@@ -242,15 +248,7 @@ class BloxrouteOpenbookOrderManager:
         if client_order_id in order_statuses:
             return order_statuses[client_order_id]
 
-        return OrderStatusInfo(
-            order_status=OrderStatus.OS_UNKNOWN,
-            quantity_released=0,
-            quantity_remaining=0,
-            side=Side.S_UNKNOWN,
-            fill_price=0,
-            client_order_i_d=0,
-            timestamp=time()
-        )
+        return []
 
 
 def normalize_trading_pair(trading_pair: str):

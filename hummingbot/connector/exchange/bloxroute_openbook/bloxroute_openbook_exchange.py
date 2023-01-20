@@ -340,8 +340,9 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             owner_address=self._sol_wallet_public_key
         )
         for token_info in account_balance.tokens:
-            self._account_balances[token_info.symbol] = Decimal(token_info.wallet_amount + token_info.unsettled_amount)
-            self._account_available_balances[token_info.symbol] = Decimal(token_info.wallet_amount)
+            symbol = "SOL" if token_info.symbol == "wSOL" else token_info.symbol
+            self._account_balances[symbol] = Decimal(token_info.wallet_amount + token_info.unsettled_amount)
+            self._account_available_balances[symbol] = Decimal(token_info.wallet_amount)
 
     async def _request_order_update(self, order: InFlightOrder) -> Dict[str, Any]:
         raise Exception("request order update not yet implemented")
@@ -351,37 +352,38 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     async def _all_trade_updates_for_order(self, order: InFlightOrder) -> List[TradeUpdate]:
         blxr_client_order_i_d = convert_hummingbot_to_blxr_client_order_id(order.client_order_id)
-        order_update = self._order_manager.get_order_status(trading_pair=order.trading_pair,
+        order_updates = self._order_manager.get_order_status(trading_pair=order.trading_pair,
                                                             client_order_id=blxr_client_order_i_d)
+        trade_updates = []
+        for order_update in order_updates:
+            if order_update.order_status == OrderStatus.OS_FILLED or order_update.order_status == OrderStatus.OS_PARTIAL_FILL:
+                side = order_update.side
+                fill_price = Decimal(order_update.fill_price)
+                fill_base_amount: Decimal = Decimal(0)
+                fill_quote_amount: Decimal = Decimal(0)
 
-        if order_update.order_status == OrderStatus.OS_FILLED:
-            side = order_update.side
-            fill_price = Decimal(order_update.fill_price)
-            fill_base_amount: Decimal = 0
-            fill_quote_amount: Decimal = 0
+                if side == Side.S_ASK:
+                    fill_base_amount = Decimal(order_update.quantity_released)
+                    fill_quote_amount = Decimal(fill_base_amount) * fill_price
+                elif side == Side.S_BID:
+                    fill_quote_amount = Decimal(order_update.quantity_released)
+                    fill_base_amount = Decimal(fill_quote_amount) * (1 / fill_price)
 
-            if side == Side.S_ASK:
-                fill_base_amount = Decimal(order_update.quantity_released)
-                fill_quote_amount = Decimal(fill_base_amount) * fill_price
-            elif side == Side.S_BID:
-                fill_quote_amount = Decimal(order_update.quantity_released)
-                fill_base_amount = Decimal(fill_quote_amount) * (1 / fill_price)
-
-            return [
-                TradeUpdate(
-                    trade_id=order.client_order_id,
-                    client_order_id=order.client_order_id,
-                    exchange_order_id=order.exchange_order_id,
-                    trading_pair=order.trading_pair,
-                    fill_timestamp=order_update.timestamp,
-                    fill_price=fill_price,
-                    fill_base_amount=fill_base_amount,
-                    fill_quote_amount=fill_quote_amount,
-                    fee=TradeFeeBase(),
+                trade_updates.append(
+                    TradeUpdate(
+                        trade_id=order.client_order_id,
+                        client_order_id=order.client_order_id,
+                        exchange_order_id=order.exchange_order_id,
+                        trading_pair=order.trading_pair,
+                        fill_timestamp=order_update.timestamp,
+                        fill_price=fill_price,
+                        fill_base_amount=fill_base_amount,
+                        fill_quote_amount=fill_quote_amount,
+                        fee=TradeFeeBase(),
+                    )
                 )
-            ]
-        else:
-            return []
+
+        return trade_updates
 
     async def _request_order_status(self, tracked_order: InFlightOrder) -> OrderUpdate:
         self.logger().info(f"looking for order with id ${tracked_order.client_order_id}")
