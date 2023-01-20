@@ -4,20 +4,11 @@ import time
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from hummingbot.core.data_type.common import OrderType, TradeType
-from hummingbot.core.data_type.in_flight_order import OrderState
-
 from bidict import bidict
 from bxsolana import Provider
 from bxsolana.provider import WsProvider
 from bxsolana_trader_proto import GetMarketsResponse, api
-from bxsolana_trader_proto.api import (
-    GetAccountBalanceResponse,
-    GetQuotesResponse,
-    GetServerTimeResponse,
-    Market,
-    TokenBalance,
-)
+from bxsolana_trader_proto.api import GetAccountBalanceResponse, GetQuotesResponse, GetServerTimeResponse, Market
 
 from hummingbot.connector.constants import s_decimal_NaN
 from hummingbot.connector.exchange.bloxroute_openbook import (
@@ -32,7 +23,6 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constan
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_manager import (
     BloxrouteOpenbookOrderManager,
 )
-
 from hummingbot.connector.exchange_py_base import ExchangePyBase
 from hummingbot.connector.trading_rule import TradingRule
 from hummingbot.core.data_type.common import OrderType, TradeType
@@ -48,6 +38,7 @@ if TYPE_CHECKING:
 
 s_logger = None
 
+
 class BloxrouteOpenbookExchange(ExchangePyBase):
     """
     BloxrouteOpenbookExchange connects with BloxRoute Labs Solana Trader API provides order book pricing, user account tracking and
@@ -57,13 +48,13 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     web_utils = web_utils
 
     def __init__(
-            self,
-            client_config_map: "ClientConfigAdapter",
-            bloxroute_api_key: str,
-            solana_wallet_public_key: str,
-            solana_wallet_private_key: str,
-            trading_pairs: Optional[List[str]] = None,
-            trading_required: bool = True,
+        self,
+        client_config_map: "ClientConfigAdapter",
+        bloxroute_api_key: str,
+        solana_wallet_public_key: str,
+        solana_wallet_private_key: str,
+        trading_pairs: Optional[List[str]] = None,
+        trading_required: bool = True,
     ):
         """
         :param bloxroute_api_key: The bloxRoute Labs authorization header to connect with solana trader api
@@ -95,7 +86,6 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         )
         self._order_book_manager_connected = False
         asyncio.create_task(self._initialize_order_manager())
-
 
         super().__init__(client_config_map)
         self.real_time_balance_update = False
@@ -214,14 +204,14 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return None
 
     def _get_fee(
-            self,
-            base_currency: str,
-            quote_currency: str,
-            order_type: OrderType,
-            order_side: TradeType,
-            amount: Decimal,
-            price: Decimal = s_decimal_NaN,
-            is_maker: Optional[bool] = None,
+        self,
+        base_currency: str,
+        quote_currency: str,
+        order_type: OrderType,
+        order_side: TradeType,
+        amount: Decimal,
+        price: Decimal = s_decimal_NaN,
+        is_maker: Optional[bool] = None,
     ) -> AddedToCostTradeFee:
         """
         To get trading fee, this function is simplified by using fee override configuration. Most parameters to this
@@ -256,8 +246,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         payer_address = base_addr if side == api.Side.S_ASK else quote_addr
 
         blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(order_id)
-        client_order_id = self.truncate(blxr_client_order_id, 7)
-        self._hummingbot_to_solana_id[order_id] = client_order_id
+        self._hummingbot_to_solana_id[order_id] = blxr_client_order_id
 
         submit_order_response = await self._provider_1.submit_order(
             owner_address=self._sol_wallet_public_key,
@@ -268,7 +257,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             amount=float(amount),
             price=float(price),
             project=OPENBOOK_PROJECT,
-            client_order_id=client_order_id,
+            client_order_id=blxr_client_order_id,
             skip_pre_flight=True,
         )
 
@@ -430,11 +419,14 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     async def _initialize_trading_pair_symbol_map(self):
         await self._update_trading_rules()
 
-def convert_hummingbot_to_blxr_client_order_id(client_order_id: str):
-    return convert_to_number(client_order_id)
 
-def convert_to_number(s):
+def convert_hummingbot_to_blxr_client_order_id(client_order_id: str):
+    return _convert_to_number(client_order_id[-7:])
+
+
+def _convert_to_number(s):
     return int.from_bytes(s.encode(), 'little')
+
 
 def convert_blxr_to_hummingbot_order_status(order_status: api.OrderStatus) -> OrderState:
     if order_status == api.OrderStatus.OS_OPEN:
