@@ -61,8 +61,10 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
             "asks": [(ask.price, ask.size) for ask in orderbook.asks],
         }
         return OrderBookMessage(OrderBookMessageType.SNAPSHOT, order_book_message_content, snapshot_timestamp)
+
     async def listen_for_subscriptions(self):
         pass
+
     async def _connected_websocket_assistant(self) -> WSAssistant:
         raise "connected websocket assistant not yet supported"
 

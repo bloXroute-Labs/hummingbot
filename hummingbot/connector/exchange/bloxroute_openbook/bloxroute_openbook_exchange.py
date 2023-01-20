@@ -45,7 +45,6 @@ if TYPE_CHECKING:
 
 s_logger = None
 
-
 class BloxrouteOpenbookExchange(ExchangePyBase):
     """
     BloxrouteOpenbookExchange connects with BloxRoute Labs Solana Trader API provides order book pricing, user account tracking and
@@ -93,6 +92,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         )
         self._order_book_manager_connected = False
         asyncio.create_task(self._initialize_order_manager())
+
 
         super().__init__(client_config_map)
         self.real_time_balance_update = False
@@ -463,6 +463,10 @@ def convert_hummingbot_to_blxr_client_order_id(client_order_id: str):
 def _convert_to_number(s):
     return int.from_bytes(s.encode(), 'little')
 
+def truncate(num: int, n: int) -> int:
+    num_str = str(num)
+    trunc_num_str = num_str[-n:]
+    return int(trunc_num_str)
 
 def convert_blxr_to_hummingbot_order_status(order_status: api.OrderStatus) -> OrderState:
     if order_status == api.OrderStatus.OS_OPEN:
@@ -477,7 +481,3 @@ def convert_blxr_to_hummingbot_order_status(order_status: api.OrderStatus) -> Or
         return OrderState.FAILED
 
 
-def truncate(num: int, n: int) -> int:
-    num_str = str(num)
-    trunc_num_str = num_str[-n:]
-    return int(trunc_num_str)
