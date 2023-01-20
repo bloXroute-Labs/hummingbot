@@ -1,6 +1,6 @@
 import asyncio
+import time
 from asyncio import Task
-from time import time
 from typing import Dict, List, Optional
 
 from bxsolana.provider import Provider
@@ -73,6 +73,17 @@ class OrderStatusInfo:
         self.fill_price = fill_price
         self.client_order_i_d = client_order_i_d
         self.timestamp = timestamp
+
+    def __eq__(self, other: "OrderStatusInfo"):
+        return (
+            self.order_status == other.order_status
+            and self.quantity_released == other.quantity_released
+            and self.quantity_remaining == other.quantity_remaining
+            and self.side == other.side
+            and self.fill_price == other.fill_price
+            and self.client_order_i_d == other.client_order_i_d
+            and self.timestamp == other.timestamp
+        )
 
 
 class BloxrouteOpenbookOrderManager:
@@ -213,7 +224,7 @@ class BloxrouteOpenbookOrderManager:
             side=os_update.side,
             fill_price=os_update.fill_price,
             client_order_i_d=os_update.client_order_i_d,
-            timestamp=time(),
+            timestamp=time.time(),
         )
         if os_update.client_order_i_d in order_statuses:
             order_statuses[os_update.client_order_i_d].append(order_status_info)
