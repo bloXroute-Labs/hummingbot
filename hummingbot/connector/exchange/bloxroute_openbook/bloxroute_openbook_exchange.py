@@ -16,6 +16,9 @@ from bxsolana_trader_proto.api import (
     GetQuotesResponse,
     GetServerTimeResponse,
     Market,
+    OrderStatus,
+    Side,
+    GetTradesResponse,
     TokenBalance,
 )
 
@@ -357,6 +360,38 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         raise Exception("request order fills not yet impgit lemented")
 
     async def _all_trade_updates_for_order(self, order: InFlightOrder) -> List[TradeUpdate]:
+
+        # solana_client_order_id = self._hummingbot_to_solana_id[order.client_order_id]
+        # order_update = self._order_manager.get_order_status(trading_pair=order.trading_pair,
+        #                                                     client_order_id=solana_client_order_id)
+        #
+        # if order_update.order_status == OrderStatus.OS_FILLED:
+        #     side = order_update.side
+        #     fill_price = Decimal(order_update.fill_price)
+        #     fill_base_amount: Decimal = 0
+        #     fill_quote_amount: Decimal = 0
+        #
+        #     if side == Side.S_ASK:
+        #         fill_base_amount = Decimal(order_update.quantity_released)
+        #         fill_quote_amount = Decimal(fill_base_amount) * fill_price
+        #     elif side == Side.S_BID:
+        #         fill_quote_amount = Decimal(order_update.quantity_released)
+        #         fill_base_amount = Decimal(fill_quote_amount) * (1 / fill_price)
+        #
+        #     return [
+        #         TradeUpdate(
+        #             trade_id=order.client_order_id,
+        #             client_order_id=order.client_order_id,
+        #             exchange_order_id=solana_client_order_id,
+        #             trading_pair=order.trading_pair,
+        #             fill_timestamp=order_update.timestamp,
+        #             fill_price=fill_price,
+        #             fill_base_amount=fill_base_amount,
+        #             fill_quote_amount=fill_quote_amount,
+        #             fee=TradeFeeBase(),
+        #         )
+        #     ]
+        # else:
         return []
 
     async def _request_order_status(self, tracked_order: InFlightOrder) -> OrderUpdate:
