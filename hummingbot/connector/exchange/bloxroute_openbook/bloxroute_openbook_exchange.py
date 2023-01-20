@@ -227,18 +227,15 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         """
         raise Exception("get fee not yet implemented")
 
-    def truncate(self, num, n):
-        return num // 10 ** (int(math.log(num, 10)) - n + 1)
-
     async def _place_order(
-            self,
-            order_id: str,
-            trading_pair: str,
-            amount: Decimal,
-            trade_type: TradeType,
-            order_type: OrderType,
-            price: Decimal,
-            **kwargs,
+        self,
+        order_id: str,
+        trading_pair: str,
+        amount: Decimal,
+        trade_type: TradeType,
+        order_type: OrderType,
+        price: Decimal,
+        **kwargs,
     ) -> Tuple[str, float]:
         side = api.Side.S_BID if trade_type == TradeType.BUY else api.Side.S_ASK
         type = api.OrderType.OT_LIMIT if order_type == OrderType.LIMIT else api.OrderType.OT_MARKET
@@ -347,14 +344,15 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             self._account_available_balances[token_info.symbol] = Decimal(token_info.wallet_amount)
 
     async def _request_order_update(self, order: InFlightOrder) -> Dict[str, Any]:
-        raise Exception("request order update not yet implmented")
+        raise Exception("request order update not yet implemented")
 
     async def _request_order_fills(self, order: InFlightOrder) -> Dict[str, Any]:
-        raise Exception("request order fills not yet impgit lemented")
+        raise Exception("request order fills not yet implemented")
 
     async def _all_trade_updates_for_order(self, order: InFlightOrder) -> List[TradeUpdate]:
         blxr_client_order_i_d = convert_hummingbot_to_blxr_client_order_id(order.client_order_id)
-        order_update = self._order_manager.get_order_status(blxr_client_order_i_d)
+        order_update = self._order_manager.get_order_status(trading_pair=order.trading_pair,
+                                                            client_order_id=blxr_client_order_i_d)
 
         if order_update.order_status == OrderStatus.OS_FILLED:
             side = order_update.side
@@ -367,7 +365,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                 fill_quote_amount = Decimal(fill_base_amount) * fill_price
             elif side == Side.S_BID:
                 fill_quote_amount = Decimal(order_update.quantity_released)
-                fill_base_amount = Decimal(fill_quote_amount) * (1/fill_price)
+                fill_base_amount = Decimal(fill_quote_amount) * (1 / fill_price)
 
             return [
                 TradeUpdate(
@@ -458,7 +456,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
 
 def convert_hummingbot_to_blxr_client_order_id(client_order_id: str):
-    return _convert_to_number(client_order_id[-7:])
+    num = _convert_to_number(client_order_id)
+    return truncate(num, 7)
 
 
 def _convert_to_number(s):
@@ -476,3 +475,9 @@ def convert_blxr_to_hummingbot_order_status(order_status: api.OrderStatus) -> Or
         return OrderState.CANCELED
     else:
         return OrderState.FAILED
+
+
+def truncate(num: int, n: int) -> int:
+    num_str = str(num)
+    trunc_num_str = num_str[-n:]
+    return int(trunc_num_str)

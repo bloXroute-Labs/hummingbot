@@ -56,7 +56,6 @@ class OrderStatusInfo:
     client_order_i_d: int
     timestamp: float
 
-
     def __init__(self,
                  order_status: OrderStatus,
                  quantity_released: float,
@@ -66,7 +65,6 @@ class OrderStatusInfo:
                  client_order_i_d: int,
                  timestamp: float,
                  ):
-
         self.order_status = order_status
         self.quantity_released = quantity_released
         self.quantity_remaining = quantity_remaining
@@ -146,7 +144,8 @@ class BloxrouteOpenbookOrderManager:
             normalized_trading_pair = normalize_trading_pair(trading_pair)
             self._markets_to_order_statuses.update({normalized_trading_pair: {}})
 
-            initialize_order_stream_task = asyncio.create_task(self._initialize_order_status_stream(trading_pair=trading_pair))
+            initialize_order_stream_task = asyncio.create_task(
+                self._initialize_order_status_stream(trading_pair=trading_pair))
             self._order_status_running_tasks.append(initialize_order_stream_task)
 
     async def _initialize_order_status_stream(self, trading_pair: str):
@@ -211,6 +210,7 @@ class BloxrouteOpenbookOrderManager:
             quantity_remaining=os_update.quantity_remaining,
             side=os_update.side,
             fill_price=os_update.fill_price,
+            client_order_i_d=os_update.client_order_i_d,
             timestamp=time()
         )})
 
@@ -242,7 +242,15 @@ class BloxrouteOpenbookOrderManager:
         if client_order_id in order_statuses:
             return order_statuses[client_order_id]
 
-        return OrderStatusInfo(OrderStatus.OS_UNKNOWN, time())
+        return OrderStatusInfo(
+            order_status=OrderStatus.OS_UNKNOWN,
+            quantity_released=0,
+            quantity_remaining=0,
+            side=Side.S_UNKNOWN,
+            fill_price=0,
+            client_order_i_d=0,
+            timestamp=time()
+        )
 
 
 def normalize_trading_pair(trading_pair: str):
