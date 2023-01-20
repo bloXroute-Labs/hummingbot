@@ -8,7 +8,14 @@ from bidict import bidict
 from bxsolana import Provider
 from bxsolana.provider import WsProvider
 from bxsolana_trader_proto import GetMarketsResponse, api
-from bxsolana_trader_proto.api import GetAccountBalanceResponse, GetQuotesResponse, GetServerTimeResponse, Market
+from bxsolana_trader_proto.api import (
+    GetAccountBalanceResponse,
+    GetQuotesResponse,
+    GetServerTimeResponse,
+    Market,
+    OrderStatus,
+    Side,
+)
 
 from hummingbot.connector.constants import s_decimal_NaN
 from hummingbot.connector.exchange.bloxroute_openbook import (
@@ -28,7 +35,7 @@ from hummingbot.connector.trading_rule import TradingRule
 from hummingbot.core.data_type.common import OrderType, TradeType
 from hummingbot.core.data_type.in_flight_order import InFlightOrder, OrderState, OrderUpdate, TradeUpdate
 from hummingbot.core.data_type.order_book_tracker_data_source import OrderBookTrackerDataSource
-from hummingbot.core.data_type.trade_fee import AddedToCostTradeFee
+from hummingbot.core.data_type.trade_fee import AddedToCostTradeFee, TradeFeeBase
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
 from hummingbot.core.network_iterator import NetworkStatus
 from hummingbot.core.web_assistant.web_assistants_factory import WebAssistantsFactory
@@ -346,7 +353,37 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         raise Exception("request order fills not yet impgit lemented")
 
     async def _all_trade_updates_for_order(self, order: InFlightOrder) -> List[TradeUpdate]:
-        return []
+        blxr_client_order_i_d = convert_hummingbot_to_blxr_client_order_id(order.client_order_id)
+        order_update = self._order_manager.get_order_status(blxr_client_order_i_d)
+
+        if order_update.order_status == OrderStatus.OS_FILLED:
+            side = order_update.side
+            fill_price = Decimal(order_update.fill_price)
+            fill_base_amount: Decimal = 0
+            fill_quote_amount: Decimal = 0
+
+            if side == Side.S_ASK:
+                fill_base_amount = Decimal(order_update.quantity_released)
+                fill_quote_amount = Decimal(fill_base_amount) * fill_price
+            elif side == Side.S_BID:
+                fill_quote_amount = Decimal(order_update.quantity_released)
+                fill_base_amount = Decimal(fill_quote_amount) * (1/fill_price)
+
+            return [
+                TradeUpdate(
+                    trade_id=order.client_order_id,
+                    client_order_id=order.client_order_id,
+                    exchange_order_id=order.exchange_order_id,
+                    trading_pair=order.trading_pair,
+                    fill_timestamp=order_update.timestamp,
+                    fill_price=fill_price,
+                    fill_base_amount=fill_base_amount,
+                    fill_quote_amount=fill_quote_amount,
+                    fee=TradeFeeBase(),
+                )
+            ]
+        else:
+            return []
 
     async def _request_order_status(self, tracked_order: InFlightOrder) -> OrderUpdate:
         self.logger().info(f"looking for order with id ${tracked_order.client_order_id}")

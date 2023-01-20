@@ -1,11 +1,17 @@
 import asyncio
 from asyncio import Task
 from time import time
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from bxsolana.provider import Provider
-from bxsolana_trader_proto import GetOrderStatusStreamResponse
-from bxsolana_trader_proto.api import GetOrderbookResponse, GetOrderStatusStreamResponse, OrderbookItem, OrderStatus
+from bxsolana_trader_proto.api import (
+    GetOrderbookResponse,
+    GetOrderStatusResponse,
+    GetOrderStatusStreamResponse,
+    OrderbookItem,
+    OrderStatus,
+    Side,
+)
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
 
@@ -43,10 +49,30 @@ class OrderbookInfo:
 
 class OrderStatusInfo:
     order_status: OrderStatus
+    quantity_released: float
+    quantity_remaining: float
+    side: Side
+    fill_price: float
+    client_order_i_d: int
     timestamp: float
 
-    def __init__(self, order_status: OrderStatus, timestamp: float):
+
+    def __init__(self,
+                 order_status: OrderStatus,
+                 quantity_released: float,
+                 quantity_remaining: float,
+                 side: Side,
+                 fill_price: float,
+                 client_order_i_d: int,
+                 timestamp: float,
+                 ):
+
         self.order_status = order_status
+        self.quantity_released = quantity_released
+        self.quantity_remaining = quantity_remaining
+        self.side = side
+        self.fill_price = fill_price
+        self.client_order_i_d = client_order_i_d
         self.timestamp = timestamp
 
 
@@ -146,11 +172,7 @@ class BloxrouteOpenbookOrderManager:
         while True:
             os_update: GetOrderStatusStreamResponse = await self._order_status_updates.get()
 
-            market = os_update.order_info.market
-            client_order_i_d = os_update.order_info.client_order_i_d
-            order_status = os_update.order_info.order_status
-
-            self._apply_order_status_update(market, client_order_i_d, order_status)
+            self._apply_order_status_update(os_update.order_info)
 
     def _apply_order_book_update(self, update: GetOrderbookResponse):
         normalized_trading_pair = normalize_trading_pair(update.market)
@@ -177,13 +199,20 @@ class BloxrouteOpenbookOrderManager:
             }
         )
 
-    def _apply_order_status_update(self, market: str, client_order_i_d: int, order_status: OrderStatus):
-        normalized_trading_pair = normalize_trading_pair(market)
+    def _apply_order_status_update(self, os_update: GetOrderStatusResponse) -> object:
+        normalized_trading_pair = normalize_trading_pair(os_update.market)
         if normalized_trading_pair not in self._markets_to_order_statuses:
             raise Exception(f"order manager does not support updates for ${normalized_trading_pair}")
 
         order_statuses = self._markets_to_order_statuses[normalized_trading_pair]
-        order_statuses.update({client_order_i_d: OrderStatusInfo(order_status=order_status, timestamp=time())})
+        order_statuses.update({os_update.client_order_i_d: OrderStatusInfo(
+            order_status=os_update.order_status,
+            quantity_released=os_update.quantity_released,
+            quantity_remaining=os_update.quantity_remaining,
+            side=os_update.side,
+            fill_price=os_update.fill_price,
+            timestamp=time()
+        )})
 
     def get_order_book(self, trading_pair: str) -> Orderbook:
         normalized_trading_pair = normalize_trading_pair(trading_pair)
