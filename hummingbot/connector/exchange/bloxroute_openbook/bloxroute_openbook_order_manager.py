@@ -1,9 +1,10 @@
 import asyncio
 from asyncio import Task
 from time import time
-from typing import Dict, List, Optional
+from typing import AsyncGenerator, Dict, List, Optional
 
 from bxsolana.provider import Provider
+from bxsolana_trader_proto import GetOrderStatusStreamResponse
 from bxsolana_trader_proto.api import GetOrderbookResponse, GetOrderStatusStreamResponse, OrderbookItem, OrderStatus
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT

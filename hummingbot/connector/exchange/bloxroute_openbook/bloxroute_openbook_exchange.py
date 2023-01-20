@@ -29,7 +29,7 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_ord
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_auth import BloxrouteOpenbookAuth
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_orderbook_manager import (
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_manager import (
     BloxrouteOpenbookOrderManager,
 )
 

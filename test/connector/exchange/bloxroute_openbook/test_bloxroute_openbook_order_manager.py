@@ -15,7 +15,8 @@ from bxsolana_trader_proto import (
     Side,
 )
 
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_orderbook_manager import (
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_manager import (
     BloxrouteOpenbookOrderManager,
 )
 
