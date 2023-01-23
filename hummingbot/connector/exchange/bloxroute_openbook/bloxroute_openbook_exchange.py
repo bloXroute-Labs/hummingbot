@@ -41,7 +41,7 @@ from hummingbot.connector.trading_rule import TradingRule
 from hummingbot.core.data_type.common import OrderType, TradeType
 from hummingbot.core.data_type.in_flight_order import InFlightOrder, OrderState, OrderUpdate, TradeUpdate
 from hummingbot.core.data_type.order_book_tracker_data_source import OrderBookTrackerDataSource
-from hummingbot.core.data_type.trade_fee import AddedToCostTradeFee
+from hummingbot.core.data_type.trade_fee import AddedToCostTradeFee, TradeFeeBase
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
 from hummingbot.core.network_iterator import NetworkStatus
 from hummingbot.core.web_assistant.web_assistants_factory import WebAssistantsFactory
@@ -259,8 +259,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         payer_address = base_addr if side == api.Side.S_ASK else quote_addr
 
         blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(order_id)
-        client_order_id = self.truncate(blxr_client_order_id, 7)
-        self._hummingbot_to_solana_id[order_id] = client_order_id
+        self._hummingbot_to_solana_id[order_id] = blxr_client_order_id
 
         submit_order_response = await self._provider_1.submit_order(
             owner_address=self._sol_wallet_public_key,
@@ -271,7 +270,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             amount=float(amount),
             price=float(price),
             project=OPENBOOK_PROJECT,
-            client_order_id=client_order_id,
+            client_order_id=blxr_client_order_id,
             skip_pre_flight=True,
         )
 
@@ -350,49 +349,50 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             owner_address=self._sol_wallet_public_key
         )
         for token_info in account_balance.tokens:
-            self._account_balances[token_info.symbol] = Decimal(token_info.wallet_amount + token_info.unsettled_amount)
-            self._account_available_balances[token_info.symbol] = Decimal(token_info.wallet_amount)
+            symbol = "SOL" if token_info.symbol == "wSOL" else token_info.symbol
+            self._account_balances[symbol] = Decimal(token_info.wallet_amount + token_info.unsettled_amount)
+            self._account_available_balances[symbol] = Decimal(token_info.wallet_amount)
 
     async def _request_order_update(self, order: InFlightOrder) -> Dict[str, Any]:
-        raise Exception("request order update not yet implmented")
+        raise Exception("request order update not yet implemented")
 
     async def _request_order_fills(self, order: InFlightOrder) -> Dict[str, Any]:
-        raise Exception("request order fills not yet impgit lemented")
+        raise Exception("request order fills not yet implemented")
 
     async def _all_trade_updates_for_order(self, order: InFlightOrder) -> List[TradeUpdate]:
+        blxr_client_order_i_d = convert_hummingbot_to_blxr_client_order_id(order.client_order_id)
+        order_updates = self._order_manager.get_order_status(trading_pair=order.trading_pair,
+                                                            client_order_id=blxr_client_order_i_d)
+        trade_updates = []
+        for order_update in order_updates:
+            if order_update.order_status == OrderStatus.OS_FILLED or order_update.order_status == OrderStatus.OS_PARTIAL_FILL:
+                side = order_update.side
+                fill_price = Decimal(order_update.fill_price)
+                fill_base_amount: Decimal = Decimal(0)
+                fill_quote_amount: Decimal = Decimal(0)
 
-        # solana_client_order_id = self._hummingbot_to_solana_id[order.client_order_id]
-        # order_update = self._order_manager.get_order_status(trading_pair=order.trading_pair,
-        #                                                     client_order_id=solana_client_order_id)
-        #
-        # if order_update.order_status == OrderStatus.OS_FILLED:
-        #     side = order_update.side
-        #     fill_price = Decimal(order_update.fill_price)
-        #     fill_base_amount: Decimal = 0
-        #     fill_quote_amount: Decimal = 0
-        #
-        #     if side == Side.S_ASK:
-        #         fill_base_amount = Decimal(order_update.quantity_released)
-        #         fill_quote_amount = Decimal(fill_base_amount) * fill_price
-        #     elif side == Side.S_BID:
-        #         fill_quote_amount = Decimal(order_update.quantity_released)
-        #         fill_base_amount = Decimal(fill_quote_amount) * (1 / fill_price)
-        #
-        #     return [
-        #         TradeUpdate(
-        #             trade_id=order.client_order_id,
-        #             client_order_id=order.client_order_id,
-        #             exchange_order_id=solana_client_order_id,
-        #             trading_pair=order.trading_pair,
-        #             fill_timestamp=order_update.timestamp,
-        #             fill_price=fill_price,
-        #             fill_base_amount=fill_base_amount,
-        #             fill_quote_amount=fill_quote_amount,
-        #             fee=TradeFeeBase(),
-        #         )
-        #     ]
-        # else:
-        return []
+                if side == Side.S_ASK:
+                    fill_base_amount = Decimal(order_update.quantity_released)
+                    fill_quote_amount = Decimal(fill_base_amount) * fill_price
+                elif side == Side.S_BID:
+                    fill_quote_amount = Decimal(order_update.quantity_released)
+                    fill_base_amount = Decimal(fill_quote_amount) * (1 / fill_price)
+
+                trade_updates.append(
+                    TradeUpdate(
+                        trade_id=order.client_order_id,
+                        client_order_id=order.client_order_id,
+                        exchange_order_id=order.exchange_order_id,
+                        trading_pair=order.trading_pair,
+                        fill_timestamp=order_update.timestamp,
+                        fill_price=fill_price,
+                        fill_base_amount=fill_base_amount,
+                        fill_quote_amount=fill_quote_amount,
+                        fee=TradeFeeBase(),
+                    )
+                )
+
+        return trade_updates
 
     async def _request_order_status(self, tracked_order: InFlightOrder) -> OrderUpdate:
         self.logger().info(f"looking for order with id ${tracked_order.client_order_id}")
@@ -460,17 +460,24 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         for trading_rule in trading_rules_list:
             self._trading_rules[trading_rule.trading_pair] = trading_rule
 
-
         self._initialize_trading_pair_symbols_from_exchange_info(markets_by_name=markets_by_name)
 
     async def _initialize_trading_pair_symbol_map(self):
         await self._update_trading_rules()
 
-def convert_hummingbot_to_blxr_client_order_id(client_order_id: str):
-    return convert_to_number(client_order_id)
 
-def convert_to_number(s):
+def convert_hummingbot_to_blxr_client_order_id(client_order_id: str):
+    num = _convert_to_number(client_order_id)
+    return truncate(num, 7)
+
+
+def _convert_to_number(s):
     return int.from_bytes(s.encode(), 'little')
+
+def truncate(num: int, n: int) -> int:
+    num_str = str(num)
+    trunc_num_str = num_str[-n:]
+    return int(trunc_num_str)
 
 def convert_blxr_to_hummingbot_order_status(order_status: api.OrderStatus) -> OrderState:
     if order_status == api.OrderStatus.OS_OPEN:
@@ -483,3 +490,4 @@ def convert_blxr_to_hummingbot_order_status(order_status: api.OrderStatus) -> Or
         return OrderState.CANCELED
     else:
         return OrderState.FAILED
+

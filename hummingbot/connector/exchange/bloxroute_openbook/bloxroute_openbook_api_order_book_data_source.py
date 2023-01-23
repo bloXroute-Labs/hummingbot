@@ -100,4 +100,4 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
         pass
 
     async def _on_order_stream_interruption(self, websocket_assistant: Optional[WSAssistant] = None):
-        raise
+        pass
