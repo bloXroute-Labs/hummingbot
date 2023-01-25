@@ -114,6 +114,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     async def check_network(self) -> NetworkStatus:
         await self._provider_1.connect()
+        await self._order_manager.start()
+
         self._server_response: GetServerTimeResponse = await self._provider_1.get_server_time()
         if self._server_response.timestamp:
             return NetworkStatus.CONNECTED
@@ -340,7 +342,9 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             owner_address=self._sol_wallet_public_key
         )
         for token_info in account_balance.tokens:
-            symbol = "SOL" if token_info.symbol == "wSOL" else token_info.symbol
+            symbol = token_info.symbol
+            if symbol == "wSOL":
+                symbol = "SOL"
             self._account_balances[symbol] = Decimal(token_info.wallet_amount + token_info.unsettled_amount)
             self._account_available_balances[symbol] = Decimal(token_info.wallet_amount)
 
@@ -369,6 +373,10 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                     fill_quote_amount = Decimal(order_update.quantity_released)
                     fill_base_amount = Decimal(fill_quote_amount) * (1 / fill_price)
 
+                fee = TradeFeeBase.new_spot_fee(
+                    fee_schema=self.trade_fee_schema(),
+                    trade_type=order.trade_type,
+                )
                 trade_updates.append(
                     TradeUpdate(
                         trade_id=order.client_order_id,
@@ -379,7 +387,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                         fill_price=fill_price,
                         fill_base_amount=fill_base_amount,
                         fill_quote_amount=fill_quote_amount,
-                        fee=TradeFeeBase(),
+                        fee=fee,
                     )
                 )
 
@@ -392,10 +400,16 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             trading_pair=tracked_order.trading_pair, client_order_id=blxr_client_order_id
         )
 
-        new_order_status = convert_blxr_to_hummingbot_order_status(order_status_info.order_status)
+        timestamp = time.time()
+        order_status = OrderStatus.OS_UNKNOWN
+        if len(order_status_info) != 0:
+            timestamp = order_status_info[-1].timestamp
+            order_status = order_status_info[-1].order_status
+
+        new_order_status = convert_blxr_to_hummingbot_order_status(order_status)
         return OrderUpdate(
             trading_pair=tracked_order.trading_pair,
-            update_timestamp=order_status_info.timestamp,
+            update_timestamp=timestamp,
             new_state=new_order_status,
             client_order_id=tracked_order.client_order_id,
             exchange_order_id=tracked_order.exchange_order_id,
