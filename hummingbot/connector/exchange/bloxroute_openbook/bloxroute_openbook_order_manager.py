@@ -4,14 +4,7 @@ from asyncio import Task
 from typing import Dict, List, Optional
 
 from bxsolana.provider import Provider
-from bxsolana_trader_proto.api import (
-    GetOrderbookResponse,
-    GetOrderStatusResponse,
-    GetOrderStatusStreamResponse,
-    OrderbookItem,
-    OrderStatus,
-    Side,
-)
+from bxsolana_trader_proto.api import (GetOrderStatusResponse, GetOrderbookResponse, OrderStatus, OrderbookItem, Side)
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
 
@@ -106,8 +99,6 @@ class BloxrouteOpenbookOrderManager:
         self._order_status_running_tasks: List[Task] = []
         self._order_status_polling_task: Optional[Task] = None
 
-        self._order_status_updates = asyncio.Queue()
-
     async def ready(self):
         await self._ready.wait()
 
@@ -126,11 +117,11 @@ class BloxrouteOpenbookOrderManager:
             self._orderbook_polling_task = asyncio.create_task(self._poll_order_book_updates())
 
             await self._initialize_order_status_streams()
-            self._order_status_polling_task = asyncio.create_task(self._poll_order_status_updates())
 
-            await asyncio.sleep(5)
+            await asyncio.sleep(10)
 
             self._is_ready = True
+            self._ready.set()
 
     async def stop(self):
         await self._provider.close()
@@ -153,24 +144,12 @@ class BloxrouteOpenbookOrderManager:
 
     async def _initialize_order_status_streams(self):
         for trading_pair in self._trading_pairs:
-            normalized_trading_pair = normalize_trading_pair(trading_pair)
-            self._markets_to_order_statuses.update({normalized_trading_pair: {}})
+            self._markets_to_order_statuses.update({trading_pair: {}})
 
             initialize_order_stream_task = asyncio.create_task(
-                self._initialize_order_status_stream(trading_pair=trading_pair)
+                self._poll_order_status_updates(trading_pair=trading_pair)
             )
             self._order_status_running_tasks.append(initialize_order_stream_task)
-
-    async def _initialize_order_status_stream(self, trading_pair: str):
-        await self._provider.connect()
-        order_status_stream = self._provider.get_order_status_stream(
-            market=trading_pair, owner_address=self._owner_address, project=OPENBOOK_PROJECT
-        )
-
-        first_response = await order_status_stream.__anext__()
-        self._order_status_updates.put_nowait(first_response)
-        async for order_status_update in order_status_stream:
-            self._order_status_updates.put_nowait(order_status_update)
 
     async def _poll_order_book_updates(self):
         await self._provider.connect()
@@ -180,11 +159,13 @@ class BloxrouteOpenbookOrderManager:
         async for order_book_update in order_book_stream:
             self._apply_order_book_update(order_book_update.orderbook)
 
-    async def _poll_order_status_updates(self):
-        while True:
-            os_update: GetOrderStatusStreamResponse = await self._order_status_updates.get()
-
-            self._apply_order_status_update(os_update.order_info)
+    async def _poll_order_status_updates(self, trading_pair: str):
+        await self._provider.connect()
+        order_status_stream = self._provider.get_order_status_stream(
+            market=trading_pair, owner_address=self._owner_address, project=OPENBOOK_PROJECT
+        )
+        async for order_status_update in order_status_stream:
+            self._apply_order_status_update(order_status_update.order_info)
 
     def _apply_order_book_update(self, update: GetOrderbookResponse):
         normalized_trading_pair = normalize_trading_pair(update.market)
