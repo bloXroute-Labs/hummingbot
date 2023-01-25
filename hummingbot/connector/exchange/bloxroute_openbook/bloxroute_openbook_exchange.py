@@ -82,9 +82,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
         self._server_response = GetServerTimeResponse
 
-        self._provider_1: Provider = WsProvider(auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
-        self._provider_2: Provider = WsProvider(auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
-        asyncio.create_task(self._initialize_order_manager())
+        self._provider_1: Provider = WsProvider(endpoint="ws://18.208.115.90:1809/ws", auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
+        self._provider_2: Provider = WsProvider(endpoint="ws://18.208.115.90:1809/ws", auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
 
         self._trading_pairs = trading_pairs
         self._order_manager: BloxrouteOpenbookOrderManager = BloxrouteOpenbookOrderManager(
