@@ -269,7 +269,11 @@ class HummingbotApplication(*commands):
 
     @staticmethod
     def _initialize_market_assets(market_name: str, trading_pairs: List[str]) -> List[Tuple[str, str]]:
-        market_trading_pairs: List[Tuple[str, str]] = [(trading_pair.split('-')) for trading_pair in trading_pairs]
+        market_trading_pairs: List[Tuple[str, str]] = []
+        for trading_pair in trading_pairs:
+            trading_pair = trading_pair.replace("/", "-")
+            market_trading_pairs.append((trading_pair.split('-')))
+
         return market_trading_pairs
 
     def _initialize_markets(self, market_names: List[Tuple[str, List[str]]]):
