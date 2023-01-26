@@ -27,10 +27,7 @@ def validate_exchange_trading_pair(value: str) -> Optional[str]:
 
 def order_amount_prompt() -> str:
     trading_pair = fixed_grid_config_map["market"].value
-    seperator = "-"
-    if "/" in trading_pair:
-        seperator = "/"
-    base_asset, quote_asset = trading_pair.split(seperator)
+    base_asset, quote_asset = trading_pair.split("-")
     return f"What is the amount of {base_asset} per order? >>> "
 
 

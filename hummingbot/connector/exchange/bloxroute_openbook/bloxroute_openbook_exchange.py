@@ -324,7 +324,6 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         """
         Returns a price step, a minimum price increment for a given trading pair.
         """
-        trading_pair = trading_pair.replace("/", "-")
         trading_rule = self._trading_rules[trading_pair]
         return trading_rule.min_price_increment
 
@@ -332,7 +331,6 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         """
         Returns an order amount step, a minimum amount increment for a given trading pair.
         """
-        trading_pair = trading_pair.replace("/", "-")
         trading_rule = self._trading_rules[trading_pair]
         return trading_rule.min_base_amount_increment
 
