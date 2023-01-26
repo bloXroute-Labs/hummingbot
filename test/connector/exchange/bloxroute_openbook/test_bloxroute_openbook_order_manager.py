@@ -6,16 +6,20 @@ from unittest.mock import AsyncMock, patch
 
 import aiounittest
 import bxsolana.provider.grpc
+from bxsolana import Provider
 from bxsolana_trader_proto import (
     GetOrderbookResponse,
     GetOrderbooksStreamResponse,
     GetOrderStatusResponse,
     GetOrderStatusStreamResponse,
-    OrderbookItem,
+    OrderType, OrderbookItem,
     OrderStatus,
     Side,
 )
 
+from bxsolana.provider.constants import LOCAL_API_WS
+
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_manager import (
     BloxrouteOpenbookOrderManager,
     OrderStatusInfo,
@@ -282,6 +286,129 @@ class TestOrderManager(aiounittest.AsyncTestCase):
 
         await os_manager.stop()
 
+    async def test_order_status_stream_forreal(self):
+
+        auth_header = "OWM5ODU1MTMtNjY0Ny00NmFhLWJkMzUtNWE4ODM0N2VlZTU4OmE2MDAxYmJjMzVlZjAyM2QyNzJkZjIxMTNhMTM2NTc0"
+        private_key = "3mvTYCLXLM3e2oucFQCtGbtR4bHkEDAJcSkq45mRVNuP7xtpvS5nGMBsHZYVRNHGqiktoBEBBdcvgGASU1DTodPM"
+        owner_address = "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5"
+        market = "SOLUSDC"
+        side = Side.S_ASK
+        type = OrderType.OT_LIMIT
+        amount = 0.01
+        price = 30
+        client_order_id = 6
+
+        provider = bxsolana.provider.WsProvider(
+            endpoint="ws://18.208.115.90:1809/ws",
+            auth_header=auth_header,
+            private_key=private_key)
+        await provider.connect()
+
+        provider_2 = bxsolana.provider.WsProvider(
+            endpoint="ws://18.208.115.90:1809/ws",
+            auth_header=auth_header,
+            private_key=private_key)
+        await provider_2.connect()
+
+        manager = BloxrouteOpenbookOrderManager(provider=provider, trading_pairs=["SOLUSDC", "ETHUSDC"],
+                                                owner_address=owner_address)
+        await manager.start()
+
+        submit_order_response = await provider_2.submit_order(
+            owner_address=owner_address,
+            payer_address=owner_address,
+            market=market,
+            side=side,
+            types=[type],
+            amount=float(amount),
+            price=float(price),
+            project=OPENBOOK_PROJECT,
+            client_order_id=client_order_id,
+            skip_pre_flight=True,
+        )
+        print(submit_order_response)
+
+        await asyncio.sleep(15)
+
+        os = manager.get_order_status(trading_pair=market, client_order_id=client_order_id)
+        print(os)
+    async def test_order_status_stream(self):
+
+        auth_header = "OWM5ODU1MTMtNjY0Ny00NmFhLWJkMzUtNWE4ODM0N2VlZTU4OmE2MDAxYmJjMzVlZjAyM2QyNzJkZjIxMTNhMTM2NTc0"
+        private_key = "3mvTYCLXLM3e2oucFQCtGbtR4bHkEDAJcSkq45mRVNuP7xtpvS5nGMBsHZYVRNHGqiktoBEBBdcvgGASU1DTodPM"
+        owner_address = "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5"
+        # payer_address = "CRc5F7tAa584dj1ayTJzY4BTtG7kEMjY8NgMH57f9vsF"
+        payer_address = "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5"
+
+        market = "SOLUSDC"
+        side = Side.S_ASK
+        type = OrderType.OT_LIMIT
+        amount = 0.01
+        price = 30
+        client_order_id = 6
+
+        queue = asyncio.Queue()
+        provider = bxsolana.provider.WsProvider(
+            endpoint="ws://54.89.184.255:1809/ws",
+            auth_header=auth_header,
+            private_key=private_key)
+        await provider.connect()
+
+        asyncio.create_task(start_os_stream(provider, market, owner_address, queue))
+        await asyncio.sleep(2)
+
+        submit_order_response = await provider.submit_order(
+            owner_address=owner_address,
+            payer_address=payer_address,
+            market=market,
+            side=side,
+            types=[type],
+            amount=float(amount),
+            price=float(price),
+            project=OPENBOOK_PROJECT,
+            client_order_id=client_order_id,
+            skip_pre_flight=True,
+        )
+        print(submit_order_response)
+
+
+        r = await queue.get()
+
+        print("done", r)
+
+
+    async def test_order_status_stream(self):
+        auth_header = "OWM5ODU1MTMtNjY0Ny00NmFhLWJkMzUtNWE4ODM0N2VlZTU4OmE2MDAxYmJjMzVlZjAyM2QyNzJkZjIxMTNhMTM2NTc0"
+        private_key = "3mvTYCLXLM3e2oucFQCtGbtR4bHkEDAJcSkq45mRVNuP7xtpvS5nGMBsHZYVRNHGqiktoBEBBdcvgGASU1DTodPM"
+        owner_address = "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5"
+        # payer_address = "CRc5F7tAa584dj1ayTJzY4BTtG7kEMjY8NgMH57f9vsF"
+        payer_address = "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5"
+
+        market = "SOLUSDC"
+        side = Side.S_ASK
+        type = OrderType.OT_LIMIT
+        amount = 0.01
+        price = 30
+        client_order_id = 6
+
+        queue = asyncio.Queue()
+        provider = bxsolana.provider.WsProvider(
+            endpoint=LOCAL_API_WS,
+            auth_header=auth_header,
+            private_key=private_key)
+        await provider.connect()
+
+        asyncio.create_task(start_os_stream(provider, market, owner_address, queue))
+        await asyncio.sleep(2)
+
+        cancel_all_response = await provider.submit_cancel_all(
+            owner_address=owner_address,
+            market=market,
+            project=OPENBOOK_PROJECT,
+            skip_pre_flight=True,
+        )
+        print(cancel_all_response)
+
 
 def orders(price_and_sizes: List[Tuple[int, int]]) -> List[OrderbookItem]:
     orderbook_items = []
@@ -306,3 +433,12 @@ async def async_generator_order_status_stream(
                 quantity_released=q_rel, quantity_remaining=q_rem
             ),
         )
+
+
+async def start_os_stream(provider: Provider, market: str, owner_address: str, queue: asyncio.Queue):
+    await provider.connect()
+    os_stream = provider.get_order_status_stream(market=market, owner_address=owner_address,
+                                                 project=OPENBOOK_PROJECT)
+    while True:
+        up = await os_stream.__anext__()
+        queue.put_nowait(up)

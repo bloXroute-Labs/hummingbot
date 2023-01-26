@@ -40,6 +40,8 @@ from hummingbot.core.data_type.user_stream_tracker_data_source import UserStream
 from hummingbot.core.network_iterator import NetworkStatus
 from hummingbot.core.web_assistant.web_assistants_factory import WebAssistantsFactory
 
+from hummingbot.client.hummingbot_application import HummingbotApplication
+
 if TYPE_CHECKING:
     from hummingbot.client.config.config_helpers import ClientConfigAdapter
 
@@ -82,7 +84,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._open_orders_address = "J7r6hkRU2XGMrDYHHtLhoCE4fPHGWzuUikuApqw3YMuj"
 
         self._server_response = GetServerTimeResponse
-        endpoint = "ws://54.163.206.248:1809/ws"
+        endpoint = "ws://54.161.46.25:1809/ws"
         self._provider_1: Provider = WsProvider(endpoint=endpoint, auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
         self._provider_2: Provider = WsProvider(endpoint=endpoint, auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
 
@@ -267,7 +269,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             skip_pre_flight=True,
         )
 
-        self.logger().info(f"placed order f{submit_order_response} with id ${blxr_client_order_id}")
+        self.logger().info(f"placed order {submit_order_response} with id {blxr_client_order_id}: {amount} @ {price}")
 
         return submit_order_response, time.time()
 
@@ -322,6 +324,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         """
         Returns a price step, a minimum price increment for a given trading pair.
         """
+        trading_pair = trading_pair.replace("/", "-")
         trading_rule = self._trading_rules[trading_pair]
         return trading_rule.min_price_increment
 
@@ -329,6 +332,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         """
         Returns an order amount step, a minimum amount increment for a given trading pair.
         """
+        trading_pair = trading_pair.replace("/", "-")
         trading_rule = self._trading_rules[trading_pair]
         return trading_rule.min_base_amount_increment
 

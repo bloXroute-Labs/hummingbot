@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 
 from bxsolana.provider import Provider
 from bxsolana_trader_proto.api import GetOrderbookResponse, GetOrderStatusResponse, OrderbookItem, OrderStatus, Side
+from hummingbot.client.hummingbot_application import HummingbotApplication
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
 
@@ -169,13 +170,11 @@ class BloxrouteOpenbookOrderManager:
             market=trading_pair, owner_address=self._owner_address, project=OPENBOOK_PROJECT
         )
 
-        with open("/Users/ironman/GolandProjects/hummingbot/buysell.py") as fd:
-            async for order_status_update in order_status_stream:
-                fd.write(
-                    f"Client Order ID: {order_status_update.order_info.client_order_i_d} Order Status: {order_status_update.order_info.order_status}"
-                    f"Price: {order_status_update.order_info.order_price} Fill Price: {order_status_update.order_info.fill_price} "
-                    f"Quant Released: {order_status_update.order_info.quantity_released} Quant Remaining: {order_status_update.order_info.quantity_remaining}")
-                self._apply_order_status_update(order_status_update.order_info)
+        async for order_status_update in order_status_stream:
+            self._apply_order_status_update(order_status_update.order_info)
+            HummingbotApplication.main_application().notify(f"order type {order_status_update.order_info.order_status} | quant rel: {order_status_update.order_info.quantity_released} | "
+                                                            f"quant rem: {order_status_update.order_info.quantity_remaining} @ {order_status_update.order_info.order_price} | "
+                                                            f"side: {order_status_update.order_info.side} with id {order_status_update.order_info.client_order_i_d}")
 
     def _apply_order_book_update(self, update: GetOrderbookResponse):
         normalized_trading_pair = normalize_trading_pair(update.market)
