@@ -81,9 +81,10 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._hummingbot_to_solana_id = {}
 
         self._server_response = GetServerTimeResponse
-
-        self._provider_1: Provider = WsProvider(endpoint="ws://18.208.115.90:1809/ws", auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
-        self._provider_2: Provider = WsProvider(endpoint="ws://18.208.115.90:1809/ws", auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
+        endpoint = "ws://54.163.206.248:1809/ws"
+        auth_header = "YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz"
+        self._provider_1: Provider = WsProvider(endpoint=endpoint, auth_header=auth_header, private_key=self._sol_wallet_private_key)
+        self._provider_2: Provider = WsProvider(endpoint=endpoint, auth_header=auth_header, private_key=self._sol_wallet_private_key)
 
         self._trading_pairs = trading_pairs
         self._order_manager: BloxrouteOpenbookOrderManager = BloxrouteOpenbookOrderManager(
@@ -173,7 +174,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     @property
     def is_cancel_request_in_exchange_synchronous(self) -> bool:
-        raise Exception("not yet implemented")
+        return True
 
     @property
     def is_trading_required(self) -> bool:
@@ -187,7 +188,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return [OrderType.LIMIT]
 
     def _is_request_exception_related_to_time_synchronizer(self, request_exception: Exception):
-        raise Exception("not yet implemented")
+        return "time" in str(request_exception)
 
     def _create_web_assistants_factory(self) -> WebAssistantsFactory:
         return web_utils.build_api_factory(
@@ -271,22 +272,26 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return submit_order_response, time.time()
 
     async def _place_cancel(self, order_id: str, tracked_order: InFlightOrder):
-        side = api.Side.S_BID if tracked_order.trade_type == TradeType.BUY else api.Side.S_ASK
-
-        if self._hummingbot_to_solana_id.get(order_id) is not None:
-            client_order_id = self._hummingbot_to_solana_id[order_id]
-        else:
+        if order_id not in self._hummingbot_to_solana_id:
             raise Exception("placed order not found")
 
-        cancel_order_response = await self._provider_1.submit_cancel_by_client_order_i_d(
-            client_order_i_d=client_order_id,
-            market_address=tracked_order.trading_pair,
-            owner_address=self._sol_wallet_public_key,
-            project=OPENBOOK_PROJECT,
-            skip_pre_flight=True,
-        )
+        client_order_id = self._hummingbot_to_solana_id[order_id]
+        try:
+            cancel_order_response = await self._provider_1.submit_cancel_by_client_order_i_d(
+                client_order_i_d=client_order_id,
+                market_address=tracked_order.trading_pair,
+                owner_address=self._sol_wallet_public_key,
+                open_orders_address="J7r6hkRU2XGMrDYHHtLhoCE4fPHGWzuUikuApqw3YMuj",
+                project=OPENBOOK_PROJECT,
+                skip_pre_flight=True,
+            )
+        except Exception as e:
+            raise e
 
         self.logger().info(f"cancelled order f{cancel_order_response}")
+        if cancel_order_response != "":
+            return True
+        return False
 
     async def _format_trading_rules(self, markets_by_name: Dict[str, Market]) -> List[TradingRule]:
         trading_rules = []
@@ -355,6 +360,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     async def _all_trade_updates_for_order(self, order: InFlightOrder) -> List[TradeUpdate]:
         blxr_client_order_i_d = convert_hummingbot_to_blxr_client_order_id(order.client_order_id)
+        await asyncio.sleep(2)
         order_updates = self._order_manager.get_order_status(trading_pair=order.trading_pair,
                                                             client_order_id=blxr_client_order_i_d)
         trade_updates = []
@@ -393,7 +399,6 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return trade_updates
 
     async def _request_order_status(self, tracked_order: InFlightOrder) -> OrderUpdate:
-        self.logger().info(f"looking for order with id ${tracked_order.client_order_id}")
         blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(tracked_order.client_order_id)
         order_status_info = self._order_manager.get_order_status(
             trading_pair=tracked_order.trading_pair, client_order_id=blxr_client_order_id
@@ -493,6 +498,6 @@ def convert_blxr_to_hummingbot_order_status(order_status: api.OrderStatus) -> Or
     elif order_status == api.OrderStatus.OS_CANCELLED:
         return OrderState.CANCELED
     else:
-        return OrderState.FAILED
+        return OrderState.PENDING_CREATE
 
 

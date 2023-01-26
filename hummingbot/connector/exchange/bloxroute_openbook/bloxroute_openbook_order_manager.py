@@ -4,7 +4,7 @@ from asyncio import Task
 from typing import Dict, List, Optional
 
 from bxsolana.provider import Provider
-from bxsolana_trader_proto.api import (GetOrderStatusResponse, GetOrderbookResponse, OrderStatus, OrderbookItem, Side)
+from bxsolana_trader_proto.api import GetOrderbookResponse, GetOrderStatusResponse, OrderbookItem, OrderStatus, Side
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
 
@@ -46,6 +46,7 @@ class OrderStatusInfo:
     quantity_remaining: float
     side: Side
     fill_price: float
+    order_price: float
     client_order_i_d: int
     timestamp: float
 
@@ -56,6 +57,7 @@ class OrderStatusInfo:
         quantity_remaining: float,
         side: Side,
         fill_price: float,
+        order_price: float,
         client_order_i_d: int,
         timestamp: float,
     ):
@@ -64,6 +66,7 @@ class OrderStatusInfo:
         self.quantity_remaining = quantity_remaining
         self.side = side
         self.fill_price = fill_price
+        self.order_price = order_price
         self.client_order_i_d = client_order_i_d
         self.timestamp = timestamp
 
@@ -74,6 +77,7 @@ class OrderStatusInfo:
             and self.quantity_remaining == other.quantity_remaining
             and self.side == other.side
             and self.fill_price == other.fill_price
+            and self.order_price == other.order_price
             and self.client_order_i_d == other.client_order_i_d
             and self.timestamp == other.timestamp
         )
@@ -118,7 +122,7 @@ class BloxrouteOpenbookOrderManager:
 
             await self._initialize_order_status_streams()
 
-            await asyncio.sleep(10)
+            await asyncio.sleep(5)
 
             self._is_ready = True
             self._ready.set()
@@ -204,6 +208,7 @@ class BloxrouteOpenbookOrderManager:
             quantity_remaining=os_update.quantity_remaining,
             side=os_update.side,
             fill_price=os_update.fill_price,
+            order_price=os_update.order_price,
             client_order_i_d=os_update.client_order_i_d,
             timestamp=time.time(),
         )
