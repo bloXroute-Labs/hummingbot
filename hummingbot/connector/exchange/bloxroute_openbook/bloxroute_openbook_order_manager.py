@@ -168,8 +168,14 @@ class BloxrouteOpenbookOrderManager:
         order_status_stream = self._provider.get_order_status_stream(
             market=trading_pair, owner_address=self._owner_address, project=OPENBOOK_PROJECT
         )
-        async for order_status_update in order_status_stream:
-            self._apply_order_status_update(order_status_update.order_info)
+
+        with open("/Users/ironman/GolandProjects/hummingbot/buysell.py") as fd:
+            async for order_status_update in order_status_stream:
+                fd.write(
+                    f"Client Order ID: {order_status_update.order_info.client_order_i_d} Order Status: {order_status_update.order_info.order_status}"
+                    f"Price: {order_status_update.order_info.order_price} Fill Price: {order_status_update.order_info.fill_price} "
+                    f"Quant Released: {order_status_update.order_info.quantity_released} Quant Remaining: {order_status_update.order_info.quantity_remaining}")
+                self._apply_order_status_update(order_status_update.order_info)
 
     def _apply_order_book_update(self, update: GetOrderbookResponse):
         normalized_trading_pair = normalize_trading_pair(update.market)

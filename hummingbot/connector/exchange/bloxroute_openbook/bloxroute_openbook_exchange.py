@@ -74,17 +74,17 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self.logger().exception("pub key is " + solana_wallet_public_key)
         self.logger().exception("private key is " + solana_wallet_private_key)
 
-        self._auth_header = bloxroute_api_key
+        self._auth_header = "YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz"
         self._sol_wallet_public_key = solana_wallet_public_key
         self._sol_wallet_private_key = solana_wallet_private_key
         self._trading_required = trading_required
         self._hummingbot_to_solana_id = {}
+        self._open_orders_address = "J7r6hkRU2XGMrDYHHtLhoCE4fPHGWzuUikuApqw3YMuj"
 
         self._server_response = GetServerTimeResponse
         endpoint = "ws://54.163.206.248:1809/ws"
-        auth_header = "YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz"
-        self._provider_1: Provider = WsProvider(endpoint=endpoint, auth_header=auth_header, private_key=self._sol_wallet_private_key)
-        self._provider_2: Provider = WsProvider(endpoint=endpoint, auth_header=auth_header, private_key=self._sol_wallet_private_key)
+        self._provider_1: Provider = WsProvider(endpoint=endpoint, auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
+        self._provider_2: Provider = WsProvider(endpoint=endpoint, auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
 
         self._trading_pairs = trading_pairs
         self._order_manager: BloxrouteOpenbookOrderManager = BloxrouteOpenbookOrderManager(
@@ -110,7 +110,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     @property
     def name(self) -> str:
-        return "bloxroute-openbook"
+        return "bloxroute_openbook"
 
     async def check_network(self) -> NetworkStatus:
         await self._provider_1.connect()
@@ -274,24 +274,23 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     async def _place_cancel(self, order_id: str, tracked_order: InFlightOrder):
         if order_id not in self._hummingbot_to_solana_id:
             raise Exception("placed order not found")
+        blxr_client_order_id = self._hummingbot_to_solana_id[order_id]
 
-        client_order_id = self._hummingbot_to_solana_id[order_id]
         try:
             cancel_order_response = await self._provider_1.submit_cancel_by_client_order_i_d(
-                client_order_i_d=client_order_id,
+                client_order_i_d=blxr_client_order_id,
                 market_address=tracked_order.trading_pair,
                 owner_address=self._sol_wallet_public_key,
-                open_orders_address="J7r6hkRU2XGMrDYHHtLhoCE4fPHGWzuUikuApqw3YMuj",
+                open_orders_address=self._open_orders_address,
                 project=OPENBOOK_PROJECT,
                 skip_pre_flight=True,
             )
-        except Exception as e:
-            raise e
 
-        self.logger().info(f"cancelled order f{cancel_order_response}")
-        if cancel_order_response != "":
-            return True
-        return False
+            self.logger().info(f"cancelled order f{cancel_order_response}")
+            return cancel_order_response != ""
+        except Exception as e:
+            print(e)
+            return False
 
     async def _format_trading_rules(self, markets_by_name: Dict[str, Market]) -> List[TradingRule]:
         trading_rules = []
@@ -461,6 +460,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return routes.out_amount  # this is the price
 
     async def _update_trading_rules(self):
+        await self._provider_1.connect()
         markets_response: GetMarketsResponse = await self._provider_1.get_markets()
         markets_by_name = markets_response.markets
 
