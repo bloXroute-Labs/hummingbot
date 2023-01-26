@@ -46,6 +46,7 @@ class OrderStatusInfo:
     quantity_remaining: float
     side: Side
     fill_price: float
+    order_price: float
     client_order_i_d: int
     timestamp: float
 
@@ -56,6 +57,7 @@ class OrderStatusInfo:
         quantity_remaining: float,
         side: Side,
         fill_price: float,
+        order_price: float,
         client_order_i_d: int,
         timestamp: float,
     ):
@@ -64,6 +66,7 @@ class OrderStatusInfo:
         self.quantity_remaining = quantity_remaining
         self.side = side
         self.fill_price = fill_price
+        self.order_price = order_price
         self.client_order_i_d = client_order_i_d
         self.timestamp = timestamp
 
@@ -118,7 +121,7 @@ class BloxrouteOpenbookOrderManager:
 
             await self._initialize_order_status_streams()
 
-            await asyncio.sleep(10)
+            await asyncio.sleep(5)
 
             self._is_ready = True
             self._ready.set()
@@ -204,6 +207,7 @@ class BloxrouteOpenbookOrderManager:
             quantity_remaining=os_update.quantity_remaining,
             side=os_update.side,
             fill_price=os_update.fill_price,
+            order_price=os_update.order_price,
             client_order_i_d=os_update.client_order_i_d,
             timestamp=time.time(),
         )
