@@ -86,7 +86,7 @@ class OrderStatusInfo:
         )
 
 
-class BloxrouteOpenbookOrderManager:
+class BloxrouteOpenbookOrderDataManager:
     def __init__(self, provider: Provider, trading_pairs: List[str], owner_address: str):
         self._provider = provider
         self._owner_address = owner_address
