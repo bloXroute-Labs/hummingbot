@@ -80,7 +80,6 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self.logger().exception("private key is " + solana_wallet_private_key)
         self.logger().exception("open orders address is " + open_orders_address)
 
-
         self._auth_header = "YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz"
         self._sol_wallet_public_key = solana_wallet_public_key
         self._sol_wallet_private_key = solana_wallet_private_key
@@ -116,23 +115,26 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     @property
     def name(self) -> str:
-        return "bloxroute_openbook"
+        return CONSTANTS.EXCHANGE_NAME
 
     async def check_network(self) -> NetworkStatus:
         await self._provider_1.connect()
         await self._order_manager.start()
 
-        self._server_response: GetServerTimeResponse = await self._provider_1.get_server_time()
-        if self._server_response.timestamp:
-            return NetworkStatus.CONNECTED
-        else:
+        try:
+            self._server_response: GetServerTimeResponse = await self._provider_1.get_server_time()
+            if self._server_response.timestamp:
+                return NetworkStatus.CONNECTED
+            else:
+                return NetworkStatus.NOT_CONNECTED
+        except Exception:
             return NetworkStatus.NOT_CONNECTED
 
     @property
     def status_dict(self) -> Dict[str, bool]:
         return {
-            "order_books_initialized": True,
-            "trading_rule_initialized": True,
+            "order_books_initialized": self._order_book_manager_connected,
+            "trading_rule_initialized": len(self._trading_rules) != 0,
         }
 
     def get_price(self, trading_pair: str, is_buy: bool) -> Decimal:
@@ -307,7 +309,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                 skip_pre_flight=True,
             )
 
-            self.logger().info(f"cancelled order f{cancel_order_response}")
+            self.logger().info(f"cancelled order f{cancel_order_response} with id {blxr_client_order_id}")
             return cancel_order_response != ""
         except Exception as e:
             print(e)
