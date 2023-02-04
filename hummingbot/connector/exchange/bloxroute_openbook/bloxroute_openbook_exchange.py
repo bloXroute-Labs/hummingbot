@@ -130,6 +130,9 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         except Exception:
             return NetworkStatus.NOT_CONNECTED
 
+    async def _update_time_synchronizer(self, pass_on_non_cancelled_error: bool = False):
+        pass
+
     @property
     def status_dict(self) -> Dict[str, bool]:
         return {
