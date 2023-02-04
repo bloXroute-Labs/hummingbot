@@ -240,8 +240,8 @@ class BloxrouteOpenbookOrderDataManager:
             remaining = order_status_info.quantity_remaining
             released = order_status_info.quantity_released
             if order_status_info.side == Side.S_BID:
-                remaining = remaining / order_status_info.order_price
-                released = released / order_status_info.order_price
+                remaining = round(remaining / order_status_info.order_price, 2)
+                released = round(released / order_status_info.order_price, 2)
             HummingbotApplication.main_application().notify(f"order type {order_status_info.order_status.name} | quantity released: {released} | "
                                                             f"quantity remaining: {remaining} | price:  {order_status_info.order_price} | "
                                                             f"side: {order_status_info.side.name} | id {client_order_id}")
