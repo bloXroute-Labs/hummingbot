@@ -88,7 +88,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._open_orders_address = open_orders_address
 
         self._server_response = GetServerTimeResponse
-        endpoint = "ws://52.29.225.54:1809/ws"
+        endpoint = CONSTANTS.WS_URL
         self._provider_1: Provider = WsProvider(endpoint=endpoint, auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
         self._provider_2: Provider = WsProvider(endpoint=endpoint, auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
 
