@@ -75,7 +75,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         :param trading_required: Whether actual trading is needed.
         """
 
-        self.logger().exception("Creating bloXoute exchange")
+        self.logger().exception("Creating bloXroute exchange")
         self.logger().exception("API Key is " + bloxroute_auth_header)
         self.logger().exception("Public Key is " + solana_wallet_public_key)
         self.logger().exception("Private Key is " + solana_wallet_private_key)
@@ -85,7 +85,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._sol_wallet_private_key = solana_wallet_private_key
         self._trading_required = trading_required
         self._hummingbot_to_solana_id = {}
-        self._open_orders_addresses = Dict[str, str] = {}
+        self._open_orders_addresses: Dict[str, str] = {}
 
         self._server_response = GetServerTimeResponse
         endpoint = CONSTANTS.WS_URL
@@ -99,13 +99,14 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._order_book_manager_connected = False
         asyncio.create_task(self._initialize_order_manager())
 
-        self._token_accounts = Dict[str, str] = {}
+        self._token_accounts: Dict[str, str] = {}
         asyncio.create_task(self._initialize_token_accounts())
 
         super().__init__(client_config_map)
         self.real_time_balance_update = False
 
     async def _initialize_token_accounts(self):
+        await self._provider_1.connect()
         account_balance_response: GetAccountBalanceResponse = await self._provider_1.get_account_balance()
         account_balance_dict = {token.symbol: token.address for token in account_balance_response.tokens}
 
