@@ -13,6 +13,7 @@ from bxsolana_trader_proto.api import (
     GetAccountBalanceResponse,
     GetQuotesResponse,
     GetServerTimeResponse,
+    GetTokenAccountsResponse,
     Market,
     OrderStatus,
     Side,
@@ -107,16 +108,16 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     async def _initialize_token_accounts(self):
         await self._provider_1.connect()
-        account_balance_response: GetAccountBalanceResponse = await self._provider_1.get_account_balance()
-        account_balance_dict = {token.symbol: token.address for token in account_balance_response.tokens}
+        token_accounts_response: GetTokenAccountsResponse = await self._provider_1.get_token_accounts(owner_address=self._sol_wallet_public_key)
+        token_account_dict = {token.symbol: token.token_account for token in token_accounts_response.accounts}
 
         for trading_pair in self._trading_pairs:
             tokens = trading_pair.split("-")
             for token in tokens:
                 if token not in self._token_accounts:
-                    if token not in account_balance_dict:
+                    if token not in token_account_dict:
                         raise Exception(f"token account for {token} does not exist")
-                    self._token_accounts[token] = account_balance_dict[token]
+                    self._token_accounts[token] = token_account_dict[token]
 
     async def _initialize_order_manager(self):
         await self._order_manager.start()
