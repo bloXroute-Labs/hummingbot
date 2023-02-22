@@ -65,13 +65,11 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def listen_for_trades(self, ev_loop: asyncio.AbstractEventLoop, output: asyncio.Queue):
         pass
 
+    # connector does not use Websocket assistant
     async def _connected_websocket_assistant(self) -> WSAssistant:
         raise NotImplementedError
 
     async def _subscribe_channels(self, ws: WSAssistant):
-        raise NotImplementedError
-
-    def _channel_originating_message(self, event_message: Dict[str, Any]) -> str:
         raise NotImplementedError
 
     async def _parse_order_book_snapshot_message(self, raw_message: Dict[str, Any], message_queue: asyncio.Queue):
