@@ -7,14 +7,17 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from bidict import bidict
 from bxsolana import Provider
 from bxsolana.provider import WsProvider
+from bxsolana.transaction import signing
 from bxsolana_trader_proto import GetMarketsResponse, api
 from bxsolana_trader_proto.api import (
     GetAccountBalanceResponse,
     GetQuotesResponse,
     GetServerTimeResponse,
+    GetTokenAccountsResponse,
     Market,
     OrderStatus,
     Side,
+    TransactionMessage,
 )
 
 from hummingbot.client.hummingbot_application import HummingbotApplication
@@ -60,32 +63,30 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     def __init__(
         self,
         client_config_map: "ClientConfigAdapter",
-        bloxroute_api_key: str,
+        bloxroute_auth_header: str,
         solana_wallet_public_key: str,
         solana_wallet_private_key: str,
-        open_orders_address: str,
         trading_pairs: Optional[List[str]] = None,
         trading_required: bool = True,
     ):
         """
-        :param bloxroute_api_key: The bloxRoute Labs authorization header to connect with solana trader api
+        :param bloxroute_auth_header: The bloxRoute Labs authorization header to connect with solana trader api
         :param solana_wallet_private_key: The secret key for a solana wallet
         :param trading_pairs: The market trading pairs which to track order book data.
         :param trading_required: Whether actual trading is needed.
         """
 
-        self.logger().exception("creating blox route exchange")
-        self.logger().exception("api key is " + bloxroute_api_key)
-        self.logger().exception("pub key is " + solana_wallet_public_key)
-        self.logger().exception("private key is " + solana_wallet_private_key)
-        self.logger().exception("open orders address is " + open_orders_address)
+        self.logger().exception("Creating bloXroute exchange")
+        self.logger().exception("API Key is " + bloxroute_auth_header)
+        self.logger().exception("Public Key is " + solana_wallet_public_key)
+        self.logger().exception("Private Key is " + solana_wallet_private_key)
 
-        self._auth_header = "YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz"
+        self._auth_header = bloxroute_auth_header
         self._sol_wallet_public_key = solana_wallet_public_key
         self._sol_wallet_private_key = solana_wallet_private_key
         self._trading_required = trading_required
         self._hummingbot_to_solana_id = {}
-        self._open_orders_address = open_orders_address
+        self._open_orders_addresses: Dict[str, str] = {}
 
         self._server_response = GetServerTimeResponse
         endpoint = CONSTANTS.WS_URL
@@ -99,8 +100,24 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._order_book_manager_connected = False
         asyncio.create_task(self._initialize_order_manager())
 
+        self._token_accounts: Dict[str, str] = {}
+        asyncio.create_task(self._initialize_token_accounts())
+
         super().__init__(client_config_map)
         self.real_time_balance_update = False
+
+    async def _initialize_token_accounts(self):
+        await self._provider_1.connect()
+        token_accounts_response: GetTokenAccountsResponse = await self._provider_1.get_token_accounts(owner_address=self._sol_wallet_public_key)
+        token_account_dict = {token.symbol: token.token_account for token in token_accounts_response.accounts}
+
+        for trading_pair in self._trading_pairs:
+            tokens = trading_pair.split("-")
+            for token in tokens:
+                if token not in self._token_accounts:
+                    if token not in token_account_dict:
+                        raise Exception(f"token account for {token} does not exist")
+                    self._token_accounts[token] = token_account_dict[token]
 
     async def _initialize_order_manager(self):
         await self._order_manager.start()
@@ -269,43 +286,53 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         base = tokens[0]
         quote = tokens[1]
 
-        # this is temporarily hard coded to a single solana wallet
-        base_addr = CONSTANTS.TOKEN_PAIR_TO_WALLET_ADDR[base]
-        quote_addr = CONSTANTS.TOKEN_PAIR_TO_WALLET_ADDR[quote]
-        payer_address = base_addr if side == api.Side.S_ASK else quote_addr
+        payer_address = self._token_accounts[base] if side == api.Side.S_ASK else self._token_accounts[quote]
+
+        open_orders_address = ""
+        if trading_pair in self._open_orders_addresses:
+            open_orders_address = self._open_orders_addresses[trading_pair]
 
         blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(order_id)
         self._hummingbot_to_solana_id[order_id] = blxr_client_order_id
 
-        submit_order_response = await self._provider_1.submit_order(
+        post_order_response = await self._provider_1.post_order(
             owner_address=self._sol_wallet_public_key,
             payer_address=payer_address,
             market=trading_pair,
             side=side,
-            types=[type],
+            type=[type],
             amount=float(amount),
             price=float(price),
+            open_orders_address=open_orders_address,
+            client_order_i_d=blxr_client_order_id,
             project=OPENBOOK_PROJECT,
-            client_order_id=blxr_client_order_id,
-            open_orders_address=self._open_orders_address,
+        )
+
+        signed_tx = signing.sign_tx(post_order_response.transaction.content)
+        post_submit_response = await self._provider_1.post_submit(
+            transaction=TransactionMessage(content=signed_tx),
             skip_pre_flight=True,
         )
 
-        self.logger().info(f"placed order {submit_order_response} with id {blxr_client_order_id}: {amount} @ {price}")
+        self.logger().info(f"placed order {post_submit_response.signature} with id {blxr_client_order_id}: {amount} @ {price}")
 
-        return submit_order_response, time.time()
+        if open_orders_address == "":
+            self._open_orders_addresses[trading_pair] = open_orders_address
+
+        return post_submit_response.signature, time.time()
 
     async def _place_cancel(self, order_id: str, tracked_order: InFlightOrder):
         if order_id not in self._hummingbot_to_solana_id:
             raise Exception("placed order not found")
         blxr_client_order_id = self._hummingbot_to_solana_id[order_id]
 
+        open_orders_address = self._open_orders_addresses[tracked_order.trading_pair]
         try:
             cancel_order_response = await self._provider_1.submit_cancel_by_client_order_i_d(
                 client_order_i_d=blxr_client_order_id,
                 market_address=tracked_order.trading_pair,
                 owner_address=self._sol_wallet_public_key,
-                open_orders_address=self._open_orders_address,
+                open_orders_address=open_orders_address,
                 project=OPENBOOK_PROJECT,
                 skip_pre_flight=True,
             )
