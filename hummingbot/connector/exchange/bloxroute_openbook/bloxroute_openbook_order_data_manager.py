@@ -7,7 +7,7 @@ from bxsolana.provider import Provider
 from bxsolana_trader_proto.api import GetOrderbookResponse, GetOrderStatusResponse, OrderbookItem, OrderStatus, Side
 
 from hummingbot.client.hummingbot_application import HummingbotApplication
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import SPOT_OPENBOOK_PROJECT
 
 
 class Orderbook:
@@ -146,7 +146,7 @@ class BloxrouteOpenbookOrderDataManager:
         for trading_pair in self._trading_pairs:
             initialized = False
             for i in range(5):
-                blxr_orderbook = await self._provider.get_orderbook(market=trading_pair, limit=5, project=OPENBOOK_PROJECT)
+                blxr_orderbook = await self._provider.get_orderbook(market=trading_pair, limit=5, project=SPOT_OPENBOOK_PROJECT)
                 if blxr_orderbook.market != "":
                     self._apply_order_book_update(blxr_orderbook)
                     initialized = True
@@ -167,7 +167,7 @@ class BloxrouteOpenbookOrderDataManager:
     async def _poll_order_book_updates(self):
         await self._provider.connect()
         order_book_stream = self._provider.get_orderbooks_stream(
-            markets=self._trading_pairs, limit=5, project=OPENBOOK_PROJECT
+            markets=self._trading_pairs, limit=5, project=SPOT_OPENBOOK_PROJECT
         )
 
         async for order_book_update in order_book_stream:
@@ -176,7 +176,7 @@ class BloxrouteOpenbookOrderDataManager:
     async def _poll_order_status_updates(self, trading_pair: str):
         await self._provider.connect()
         order_status_stream = self._provider.get_order_status_stream(
-            market=trading_pair, owner_address=self._owner_address, project=OPENBOOK_PROJECT
+            market=trading_pair, owner_address=self._owner_address, project=SPOT_OPENBOOK_PROJECT
         )
 
         while True:

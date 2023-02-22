@@ -29,13 +29,21 @@ from hummingbot.connector.exchange.bloxroute_openbook import (
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_order_book_data_source import (
     BloxrouteOpenbookAPIOrderBookDataSource,
 )
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import (
+    CLIENT_ORDER_ID_MAX_LENGTH,
+    SPOT_OPENBOOK_PROJECT,
+)
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import BloxrouteOpenbookOrderBook
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_data_manager import (
     BloxrouteOpenbookOrderDataManager,
 )
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_utils import (
+    order_type_to_blxr_order_type,
+    trade_type_to_side,
+)
 from hummingbot.connector.exchange_py_base import ExchangePyBase
 from hummingbot.connector.trading_rule import TradingRule
+from hummingbot.core.api_throttler.async_throttler import AsyncThrottler
 from hummingbot.core.data_type.common import OrderType, TradeType
 from hummingbot.core.data_type.in_flight_order import InFlightOrder, OrderState, OrderUpdate, TradeUpdate
 from hummingbot.core.data_type.order_book import OrderBook, OrderBookMessage
@@ -44,6 +52,7 @@ from hummingbot.core.data_type.trade_fee import AddedToCostTradeFee, DeductedFro
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
 from hummingbot.core.network_iterator import NetworkStatus
 from hummingbot.core.web_assistant.auth import AuthBase
+from hummingbot.core.web_assistant.connections.data_types import RESTMethod
 from hummingbot.core.web_assistant.web_assistants_factory import WebAssistantsFactory
 
 if TYPE_CHECKING:
@@ -125,6 +134,20 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
         print("order books initialized!")
 
+    def _api_request(
+            self,
+            path_url,
+            overwrite_url: Optional[str] = None,
+            method: RESTMethod = RESTMethod.GET,
+            params: Optional[Dict[str, Any]] = None,
+            data: Optional[Dict[str, Any]] = None,
+            is_auth_required: bool = False,
+            return_err: bool = False,
+            limit_id: Optional[str] = None,
+            **kwargs,
+    ) -> Dict[str, Any]:
+        pass
+
     def authenticator(self):
         return AuthBase()
 
@@ -166,31 +189,23 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     @property
     def rate_limits_rules(self):
-        return CONSTANTS.RATE_LIMITS
+        return []
 
     @property
     def domain(self):
-        return CONSTANTS.DEFAULT_DOMAIN
+        return ""
 
     @property
     def client_order_id_max_length(self):
-        return CONSTANTS.MAX_ORDER_ID_LEN
+        return CLIENT_ORDER_ID_MAX_LENGTH
 
     @property
     def client_order_id_prefix(self):
-        return CONSTANTS.HBOT_ORDER_ID_PREFIX
+        return ""
 
     @property
     def trading_rules_request_path(self):
         raise "not implemented"
-
-    @property
-    def trading_pairs_request_path(self):
-        return CONSTANTS.MARKET_PATH
-
-    @property
-    def check_network_request_path(self):
-        raise Exception("not implemented")
 
     @property
     def trading_pairs(self):
@@ -215,9 +230,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return "time" in str(request_exception)
 
     def _create_web_assistants_factory(self) -> WebAssistantsFactory:
-        return web_utils.build_api_factory(
-            throttler=self._throttler, time_synchronizer=self._time_synchronizer, auth=self._auth
-        )
+        return WebAssistantsFactory(throttler=AsyncThrottler([]))
 
     def _create_order_book_data_source(self) -> OrderBookTrackerDataSource:
         return BloxrouteOpenbookAPIOrderBookDataSource(
@@ -279,8 +292,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         price: Decimal,
         **kwargs,
     ) -> Tuple[str, float]:
-        side = api.Side.S_BID if trade_type == TradeType.BUY else api.Side.S_ASK
-        type = api.OrderType.OT_LIMIT if order_type == OrderType.LIMIT else api.OrderType.OT_MARKET
+        side = trade_type_to_side(trade_type)
+        type = order_type_to_blxr_order_type(order_type)
 
         tokens = trading_pair.split("-")
         base = tokens[0]
@@ -305,7 +318,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             price=float(price),
             open_orders_address=open_orders_address,
             client_order_i_d=blxr_client_order_id,
-            project=OPENBOOK_PROJECT,
+            project=SPOT_OPENBOOK_PROJECT,
         )
 
         signed_tx = signing.sign_tx(post_order_response.transaction.content)
@@ -333,7 +346,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                 market_address=tracked_order.trading_pair,
                 owner_address=self._sol_wallet_public_key,
                 open_orders_address=open_orders_address,
-                project=OPENBOOK_PROJECT,
+                project=SPOT_OPENBOOK_PROJECT,
                 skip_pre_flight=True,
             )
 
@@ -399,8 +412,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             symbol = token_info.symbol
             if symbol == "wSOL":
                 symbol = "SOL"
-            self._account_balances[symbol] = Decimal(token_info.wallet_amount + token_info.unsettled_amount)
-            self._account_available_balances[symbol] = Decimal(token_info.wallet_amount)
+            self._account_balances[symbol] = Decimal(token_info.settled_amount + token_info.unsettled_amount)
+            self._account_available_balances[symbol] = Decimal(token_info.settled_amount)
 
     async def _request_order_update(self, order: InFlightOrder) -> Dict[str, Any]:
         raise Exception("request order update not yet implemented")
@@ -508,7 +521,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         out_token = split_token[1]
 
         quotes_response: GetQuotesResponse = await self._provider_1.get_quotes(
-            in_token=in_token, out_token=out_token, in_amount=1, slippage=0.05, limit=1, projects=[OPENBOOK_PROJECT]
+            in_token=in_token, out_token=out_token, in_amount=1, slippage=0.05, limit=1, projects=[SPOT_OPENBOOK_PROJECT]
         )
         quotes = quotes_response.quotes[-1]
         routes = quotes.routes[-1]

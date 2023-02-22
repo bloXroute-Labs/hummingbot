@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Any, Dict
 
 import bxsolana_trader_proto.api as api
+import bxsolana_trader_proto.common as common
 from pydantic import Field, SecretStr
 
 from hummingbot.client.config.config_data_types import BaseConnectorConfigMap, ClientFieldData
@@ -19,18 +20,7 @@ DEFAULT_FEES = TradeFeeSchema(
 )
 
 
-def is_exchange_information_valid(exchange_info: Dict[str, Any]) -> bool:
-    """
-    Verifies if a trading pair is enabled to operate with based on its exchange information
-    :param exchange_info: the exchange information for a trading pair
-    :return: True if the trading pair is enabled, False otherwise
-    """
-
-    ##TODO: this needs some logic to make sure that the exchange info is valid and not just return true
-    return True
-
-
-class BloxRouteConnectorMap(BaseConnectorConfigMap):
+class BloXrouteConnectorMap(BaseConnectorConfigMap):
     connector: str = Field(default="bloxroute_openbook", client_data=None)
     bloxroute_auth_header: SecretStr = Field(
         default=...,
@@ -66,22 +56,22 @@ class BloxRouteConnectorMap(BaseConnectorConfigMap):
         title = "bloxroute_openbook"
 
 
-KEYS = BloxRouteConnectorMap.construct()
+KEYS = BloXrouteConnectorMap.construct()
 
 
-# def TradeTypeToSide(type: TradeType) -> api.Side:
-#     if type.value == type.BUY:
-#         return api.Side.S_BID
-#     elif type.value == type.SELL:
-#         return api.Side.S_ASK
-#     else:
-#         return api.Side.S_UNKNOWN
-#
-#
-# def OrderTypeToBlxrOrderType(orderType: OrderType) -> api.OrderType:
-#     if orderType.value == orderType.MARKET:
-#         return api.OrderType.OT_MARKET
-#     elif orderType.value == orderType.LIMIT:
-#         return api.OrderType.OT_LIMIT
-#     else:
-#         raise Exception(f"unknown order type ${orderType.value}")  # TODO need unknown value
+def trade_type_to_side(trade_type: TradeType) -> api.Side:
+    if trade_type.value == trade_type.BUY:
+        return api.Side.S_BID
+    elif trade_type.value == trade_type.SELL:
+        return api.Side.S_ASK
+    else:
+        return api.Side.S_UNKNOWN
+
+
+def order_type_to_blxr_order_type(order_type: OrderType) -> common.OrderType:
+    if order_type.value == order_type.MARKET:
+        return common.OrderType.OT_MARKET
+    elif order_type.value == order_type.LIMIT:
+        return common.OrderType.OT_LIMIT
+    else:
+        raise Exception(f"unknown order type ${order_type.value}")

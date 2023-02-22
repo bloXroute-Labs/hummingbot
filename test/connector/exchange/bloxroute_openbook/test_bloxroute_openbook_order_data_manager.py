@@ -16,7 +16,7 @@ from bxsolana_trader_proto import (
     Side,
 )
 
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import SPOT_OPENBOOK_PROJECT
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_data_manager import (
     BloxrouteOpenbookOrderDataManager,
     OrderStatusInfo,
@@ -370,7 +370,7 @@ async def async_generator_order_status_stream(
 async def start_os_stream(provider: Provider, market: str, owner_address: str, queue: asyncio.Queue):
     await provider.connect()
     os_stream = provider.get_order_status_stream(market=market, owner_address=owner_address,
-                                                 project=OPENBOOK_PROJECT)
+                                                 project=SPOT_OPENBOOK_PROJECT)
     while True:
         up = await os_stream.__anext__()
         queue.put_nowait(up)

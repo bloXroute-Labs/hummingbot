@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator, Dict, List, Optional
 from bxsolana import Provider
 from bxsolana_trader_proto import GetOrderbookResponse, GetOrderbooksStreamResponse
 
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import OPENBOOK_PROJECT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import SPOT_OPENBOOK_PROJECT
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import BloxrouteOpenbookOrderBook
 from hummingbot.core.data_type.order_book_message import OrderBookMessage, OrderBookMessageType
 from hummingbot.core.data_type.order_book_tracker_data_source import OrderBookTrackerDataSource
@@ -37,7 +37,7 @@ class BloxrouteOpenbookAPIOrderBookDataSource(OrderBookTrackerDataSource):
         :return: the response from the exchange (JSON dictionary)
         """
         orderbook: GetOrderbookResponse = await self._provider.get_orderbook(
-            market=trading_pair, limit=1, project=OPENBOOK_PROJECT
+            market=trading_pair, limit=1, project=SPOT_OPENBOOK_PROJECT
         )
 
         snapshot_timestamp: float = time.time()
