@@ -6,17 +6,16 @@ from typing import Dict, List, Optional
 import bxsolana_trader_proto.api as api
 
 from hummingbot.client.hummingbot_application import HummingbotApplication
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import SPOT_OPENBOOK_PROJECT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import ORDERBOOK_RETRIES, \
+    SPOT_OPENBOOK_PROJECT
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import (
     Orderbook,
     OrderbookInfo,
     OrderStatusInfo,
 )
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider import (
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider_manager import (
     BloxrouteOpenbookProviderManager,
 )
-
-ORDERBOOK_RETRIES = 5
 
 
 class BloxrouteOpenbookOrderDataManager:
@@ -31,10 +30,9 @@ class BloxrouteOpenbookOrderDataManager:
         self._order_books: Dict[str, OrderbookInfo] = {}
         self._markets_to_order_statuses: Dict[str, Dict[int, List[OrderStatusInfo]]] = {}
 
+        self._start_lock = asyncio.Lock()
         self._started = asyncio.Event()
         self._ready = asyncio.Event()
-
-        self._start_lock = asyncio.Lock()
 
         self._orderbook_polling_task: Optional[Task] = None
         self._order_status_running_tasks: List[Task] = []
@@ -46,10 +44,6 @@ class BloxrouteOpenbookOrderDataManager:
     @property
     def is_ready(self):
         return self._ready.is_set()
-
-    @property
-    def started(self):
-        return self._started.is_set()
 
     async def start(self):
         await self._start_lock.acquire()
@@ -67,7 +61,6 @@ class BloxrouteOpenbookOrderDataManager:
         self._start_lock.release()
 
     async def stop(self):
-        await self._provider.close()
         if self._orderbook_polling_task is not None:
             self._orderbook_polling_task.cancel()
             self._orderbook_polling_task = None
@@ -89,7 +82,7 @@ class BloxrouteOpenbookOrderDataManager:
 
                     break
             if not initialized:
-                raise Exception(f"orderbook for {trading_pair} not initialized")
+                raise Exception(f"orderbook for {trading_pair} not initialized successfully")
 
     async def _initialize_order_status_streams(self):
         for trading_pair in self._trading_pairs:
@@ -137,6 +130,7 @@ class BloxrouteOpenbookOrderDataManager:
                     best_bid_price=best_bid_price,
                     best_bid_size=best_bid_size,
                     latest_order_book=latest_order_book,
+                    timestamp=time.time()
                 )
             }
         )
@@ -161,8 +155,7 @@ class BloxrouteOpenbookOrderDataManager:
 
         updated = False
         if client_order_id in order_statuses:
-            if order_statuses[client_order_id][-1].order_status != os_update.order_status or \
-                order_statuses[client_order_id][-1].quantity_remaining != os_update.quantity_remaining:
+            if order_statuses[client_order_id][-1].quantity_remaining != os_update.quantity_remaining:
                 order_statuses[client_order_id].append(order_status_info)
                 updated = True
         else:

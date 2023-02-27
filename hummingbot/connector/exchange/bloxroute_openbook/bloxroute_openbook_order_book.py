@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from bxsolana_trader_proto import GetOrderbookResponse, api as api
+from bxsolana_trader_proto import GetOrderbookResponse, api
 from bxsolana_trader_proto.api import OrderbookItem
 
 from hummingbot.core.data_type.order_book import OrderBook
-from hummingbot.core.data_type.order_book_message import OrderBookMessage, OrderBookMessageType
 from hummingbot.core.data_type.order_book_row import OrderBookRow
 
 
@@ -22,6 +21,7 @@ class OrderbookInfo:
     best_bid_price: float
     best_bid_size: float
     latest_order_book: Orderbook
+    timestamp: float
 
 
 @dataclass
@@ -63,6 +63,7 @@ class BloxrouteOpenbookOrderBook(OrderBook):
             )
         else:
             raise Exception(f"orderbook snapshot update did not contain `orderbook` field: {msg}")
+
 
 def orders_to_orderbook_rows(orders: List[OrderbookItem]) -> List[OrderBookRow]:
     orderbook_rows = []

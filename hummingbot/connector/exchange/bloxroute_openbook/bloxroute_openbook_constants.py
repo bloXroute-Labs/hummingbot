@@ -7,3 +7,4 @@ WS_URL = "ws://52.29.225.54:1809/ws"
 REST_URL = "https://virginia.solana.dex.blxrbdn.com"
 
 CLIENT_ORDER_ID_MAX_LENGTH = 10
+ORDERBOOK_RETRIES = 2
