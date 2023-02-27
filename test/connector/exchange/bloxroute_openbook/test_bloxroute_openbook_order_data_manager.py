@@ -100,9 +100,9 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         )
 
         # new values
-        # new_bids = orders([(10, 2), (12, 7)])
-        # new_asks = orders([(14, 3), (16, 4)])
-        # orderbook_stream_mock.return_value = async_generator_orderbook_stream("SOLUSDC", , new_asks)
+        new_bids = orders([(10, 2), (12, 7)])
+        new_asks = orders([(14, 3), (16, 4)])
+        orderbook_stream_mock.return_value = async_generator_orderbook_stream("SOLUSDC", new_bids, new_asks)
 
         provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=test_private_key)
         ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], test_owner_address)
