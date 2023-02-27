@@ -3,7 +3,7 @@ import asyncio
 import bxsolana
 
 
-class BloxrouteOpenbookProviderManager(bxsolana.provider.WsProvider):
+class BloxrouteOpenbookProvider(bxsolana.provider.WsProvider):
     _provider_connected = asyncio.Event()
 
     def __init__(self, endpoint: str, auth_header: str, private_key: str):

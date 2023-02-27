@@ -6,20 +6,22 @@ from typing import Dict, List, Optional
 import bxsolana_trader_proto.api as api
 
 from hummingbot.client.hummingbot_application import HummingbotApplication
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import ORDERBOOK_RETRIES, \
-    SPOT_OPENBOOK_PROJECT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import (
+    ORDERBOOK_RETRIES,
+    SPOT_OPENBOOK_PROJECT,
+)
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import (
     Orderbook,
     OrderbookInfo,
     OrderStatusInfo,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider_manager import (
-    BloxrouteOpenbookProviderManager,
+    BloxrouteOpenbookProvider,
 )
 
 
 class BloxrouteOpenbookOrderDataManager:
-    def __init__(self, provider: BloxrouteOpenbookProviderManager, trading_pairs: List[str], owner_address: str):
+    def __init__(self, provider: BloxrouteOpenbookProvider, trading_pairs: List[str], owner_address: str):
         self._provider = provider
         self._owner_address = owner_address
 

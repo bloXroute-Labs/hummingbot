@@ -17,7 +17,7 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_d
     BloxrouteOpenbookOrderDataManager,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider_manager import (
-    BloxrouteOpenbookProviderManager,
+    BloxrouteOpenbookProvider,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_utils import (
     order_type_to_blxr_order_type,
@@ -77,8 +77,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         )
         asyncio.create_task(self._initialize_order_manager())
 
-        self._provider = BloxrouteOpenbookProviderManager(endpoint=constants.WS_URL, auth_header=self._auth_header,
-                                                          private_key=self._sol_wallet_private_key)
+        self._provider = BloxrouteOpenbookProvider(endpoint=constants.WS_URL, auth_header=self._auth_header,
+                                                   private_key=self._sol_wallet_private_key)
 
         super().__init__(client_config_map)
 
