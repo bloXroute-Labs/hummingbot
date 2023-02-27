@@ -344,31 +344,6 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
 
         await os_manager.stop()
 
-    async def test_order_status_stream_forreal(self):
-        auth_header = "YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz"
-        private_key = "3mvTYCLXLM3e2oucFQCtGbtR4bHkEDAJcSkq45mRVNuP7xtpvS5nGMBsHZYVRNHGqiktoBEBBdcvgGASU1DTodPM"
-        owner_address = "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5"
-        market = "SOLUSDC"
-
-        provider = bxsolana.provider.WsProvider(
-            endpoint=LOCAL_API_WS,
-            auth_header=auth_header,
-            private_key=private_key)
-        await provider.connect()
-
-    def test_async_for(self):
-        auth_header = "YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz"
-        private_key = "3mvTYCLXLM3e2oucFQCtGbtR4bHkEDAJcSkq45mRVNuP7xtpvS5nGMBsHZYVRNHGqiktoBEBBdcvgGASU1DTodPM"
-        p = bxsolana.provider.WsProvider(
-            endpoint=LOCAL_API_WS,
-            auth_header=auth_header,
-            private_key=private_key
-        )
-
-        s = p.get_order_status_stream(market="SOLUSDC", owner_address="")
-
-
-
 def orders(price_and_sizes: List[Tuple[int, int]]) -> List[OrderbookItem]:
     orderbook_items = []
     for price, size in price_and_sizes:
