@@ -15,9 +15,7 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_b
     OrderbookInfo,
     OrderStatusInfo,
 )
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider_manager import (
-    BloxrouteOpenbookProvider,
-)
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider import BloxrouteOpenbookProvider
 
 
 class BloxrouteOpenbookOrderDataManager:
@@ -76,8 +74,7 @@ class BloxrouteOpenbookOrderDataManager:
         for trading_pair in self._trading_pairs:
             initialized = False
             for i in range(ORDERBOOK_RETRIES):
-                blxr_orderbook = await self._provider.get_orderbook(market=trading_pair, limit=5,
-                                                                    project=SPOT_OPENBOOK_PROJECT)
+                blxr_orderbook = await self._provider.get_orderbook(market=trading_pair, limit=5, project=SPOT_OPENBOOK_PROJECT)
                 if blxr_orderbook.market != "":
                     self._apply_order_book_update(blxr_orderbook)
                     initialized = True
@@ -87,6 +84,7 @@ class BloxrouteOpenbookOrderDataManager:
                 raise Exception(f"orderbook for {trading_pair} not initialized successfully")
 
     async def _initialize_order_status_streams(self):
+        await self._provider.wait_connect()
         for trading_pair in self._trading_pairs:
             self._markets_to_order_statuses.update({trading_pair: {}})
 

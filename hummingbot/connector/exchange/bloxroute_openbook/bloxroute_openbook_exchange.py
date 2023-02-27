@@ -16,9 +16,7 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_b
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_data_manager import (
     BloxrouteOpenbookOrderDataManager,
 )
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider_manager import (
-    BloxrouteOpenbookProvider,
-)
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider import BloxrouteOpenbookProvider
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_utils import (
     order_type_to_blxr_order_type,
     trade_type_to_side,
