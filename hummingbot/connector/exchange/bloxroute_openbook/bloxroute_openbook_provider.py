@@ -15,8 +15,7 @@ class BloxrouteOpenbookProvider(bxsolana.provider.WsProvider):
 
     async def wait_connect(self):
         await self._provider_connected.wait()
-        print("done waiting")
 
     @property
-    def connected(self):
+    def connected(self) -> bool:
         return self._provider_connected.is_set()

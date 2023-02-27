@@ -66,6 +66,10 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._order_id_mapper: Dict[str, int] = {}  # maps Hummingbot to bloXroute order id
         self._open_orders_address_mapper: Dict[str, str] = {}  # maps trading pair to open orders address
 
+        self._provider = BloxrouteOpenbookProvider(endpoint=constants.WS_URL, auth_header=self._auth_header,
+                                                   private_key=self._sol_wallet_private_key)
+        asyncio.create_task(self._provider.connect())
+
         self._token_accounts: Dict[str, str] = {}
         self._trading_pairs = trading_pairs
         asyncio.create_task(self._initialize_token_accounts())
@@ -75,13 +79,11 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         )
         asyncio.create_task(self._initialize_order_manager())
 
-        self._provider = BloxrouteOpenbookProvider(endpoint=constants.WS_URL, auth_header=self._auth_header,
-                                                   private_key=self._sol_wallet_private_key)
 
         super().__init__(client_config_map)
 
     async def _initialize_token_accounts(self):
-        await self._provider_connected.wait()
+        await self._provider.wait_connect()
         token_accounts_response: api.GetTokenAccountsResponse = await self._provider.get_token_accounts(
             owner_address=self._sol_wallet_public_key)
         token_account_dict = {token.symbol: token.token_account for token in token_accounts_response.accounts}
@@ -95,7 +97,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                     self._token_accounts[token] = token_account_dict[token]
 
     async def _initialize_order_manager(self):
-        await self._provider_connected.wait()
+        await self._provider.wait_connect()
         await self._order_manager.start()
         await self._order_manager.ready()
 
@@ -106,10 +108,11 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     @property
     def status_dict(self) -> Dict[str, bool]:
         return {
-            "order_books_initialized": self._order_manager.is_ready,
+            "provider_connected": self._provider.connected,
+            "order_manager_initialized": self._order_manager.is_ready,
             "account_balance": not self.is_trading_required or len(self._account_balances) > 0,
             "trading_rules_initialized": len(self._trading_rules) != 0,
-            "token_accounts_initialized": len(self._token_accounts) != 0
+            "token_accounts_initialized": len(self._token_accounts) != 0,
         }
 
     @property
@@ -144,6 +147,14 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     def is_trading_required(self) -> bool:
         return self._trading_required
 
+    @property
+    def trading_pairs_request_path(self) -> str:
+        return ""
+
+    @property
+    def check_network_request_path(self) -> str:
+        return ""
+
     def _api_request(
         self,
         path_url,
@@ -162,7 +173,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return AuthBase()
 
     async def check_network(self) -> NetworkStatus:
-        await self._provider_connected.wait()
+        await self._provider.wait_connect()
         await self._order_manager.ready()
 
         try:
