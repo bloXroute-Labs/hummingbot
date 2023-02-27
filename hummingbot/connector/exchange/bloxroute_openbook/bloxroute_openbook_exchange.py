@@ -110,7 +110,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return {
             "order_books_initialized": self._order_manager.is_ready,
             "account_balance": not self.is_trading_required or len(self._account_balances) > 0,
-            "trading_rule_initialized": len(self._trading_rules) != 0,
+            "trading_rules_initialized": len(self._trading_rules) != 0,
+            "token_accounts_initialized": len(self._token_accounts) != 0
         }
 
     @property
@@ -157,7 +158,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         limit_id: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
-        pass
+        raise NotImplementedError
 
     def authenticator(self):
         return AuthBase()
@@ -360,7 +361,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     async def _all_trade_updates_for_order(self, order: InFlightOrder) -> List[TradeUpdate]:
         blxr_client_order_i_d = convert_hummingbot_to_blxr_client_order_id(order.client_order_id)
-        order_updates = self._order_manager.get_order_status(
+        order_updates = self._order_manager.get_order_statuses(
             trading_pair=order.trading_pair, client_order_id=blxr_client_order_i_d
         )
         trade_updates = []
@@ -403,7 +404,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     async def _request_order_status(self, tracked_order: InFlightOrder) -> OrderUpdate:
         blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(tracked_order.client_order_id)
-        order_status_info = self._order_manager.get_order_status(
+        order_status_info = self._order_manager.get_order_statuses(
             trading_pair=tracked_order.trading_pair, client_order_id=blxr_client_order_id
         )
 
