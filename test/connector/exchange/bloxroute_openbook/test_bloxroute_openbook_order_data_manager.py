@@ -4,16 +4,8 @@ from typing import List, Tuple
 from unittest.mock import AsyncMock, patch
 
 import aiounittest
+import bxsolana_trader_proto as proto
 from bxsolana import Provider
-from bxsolana_trader_proto import (
-    GetOrderbookResponse,
-    GetOrderbooksStreamResponse,
-    GetOrderStatusResponse,
-    GetOrderStatusStreamResponse,
-    OrderbookItem,
-    OrderStatus,
-    Side,
-)
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import SPOT_OPENBOOK_PROJECT
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import OrderStatusInfo
@@ -22,10 +14,9 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_d
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider import BloxrouteOpenbookProvider
 
+TEST_PRIVATE_KEY = "3771ddf5dd1d38ff72334b9763dc3cbc6fc3196f23e651f391fe65e31e466e3d"  # randomly generated
+TEST_OWNER_ADDRESS = "OWNER_ADDRESS"
 MANAGER_START_WAIT = 0.01
-
-test_private_key = "3771ddf5dd1d38ff72334b9763dc3cbc6fc3196f23e651f391fe65e31e466e3d"
-test_owner_address = "OWNER_ADDRESS"
 
 
 class TestOrderDataManager(aiounittest.AsyncTestCase):
@@ -35,17 +26,17 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
     async def test_initalize_orderbook(self, get_orderbook_mock: AsyncMock, connect_mock: AsyncMock):
         bids = orders([(5, 2), (6, 7)])
         asks = orders([(7, 4), (8, 4)])
-        get_orderbook_mock.return_value = GetOrderbookResponse(
+        get_orderbook_mock.return_value = proto.GetOrderbookResponse(
             market="SOLUSDC",
             market_address="SOL_USDC_Market",
             bids=bids,
             asks=asks,
         )
 
-        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=test_private_key)
+        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=TEST_PRIVATE_KEY)
         await provider.connect()
 
-        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], test_owner_address)
+        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], TEST_OWNER_ADDRESS)
         await ob_manager.start()
 
         ob, timestamp = ob_manager.get_order_book("SOLUSDC")
@@ -65,17 +56,17 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
     ):
         bids = orders([])
         asks = orders([])
-        orderbook_mock.return_value = GetOrderbookResponse(
+        orderbook_mock.return_value = proto.GetOrderbookResponse(
             market="SOLUSDC",
             market_address="SOL_USDC_Market",
             bids=bids,
             asks=asks,
         )
 
-        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=test_private_key)
+        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=TEST_PRIVATE_KEY)
         await provider.connect()
 
-        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], test_owner_address)
+        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], TEST_OWNER_ADDRESS)
         await ob_manager.start()
 
         ob, timestamp = ob_manager.get_order_book("SOLUSDC")
@@ -96,7 +87,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         # same as first test
         bids = orders([(5, 2), (6, 7)])
         asks = orders([(7, 4), (8, 4)])
-        orderbook_mock.return_value = GetOrderbookResponse(
+        orderbook_mock.return_value = proto.GetOrderbookResponse(
             market="SOLUSDC",
             market_address="SOL_USDC_Market",
             bids=bids,
@@ -108,10 +99,10 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         new_asks = orders([(14, 3), (16, 4)])
         orderbook_stream_mock.return_value = async_generator_orderbook_stream("SOLUSDC", new_bids, new_asks)
 
-        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=test_private_key)
+        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=TEST_PRIVATE_KEY)
         await provider.connect()
 
-        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], test_owner_address)
+        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], TEST_OWNER_ADDRESS)
         await ob_manager.start()
 
         await asyncio.sleep(MANAGER_START_WAIT)
@@ -147,18 +138,18 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
 
             if market == "SOLUSDC":
                 return async_generator_order_status_stream(
-                    [("SOL/USDC", 123, 10, OrderStatus.OS_FILLED, Side.S_ASK, 0.3, 0.2)])
+                    [("SOL/USDC", 123, 10, proto.OrderStatus.OS_FILLED, proto.Side.S_ASK, 0.3, 0.2)])
             elif market == "BTCUSDC":
                 return async_generator_order_status_stream(
                     [
-                        ("BTC-USDC", 456, 50, OrderStatus.OS_PARTIAL_FILL, Side.S_BID, 0.4, 0.2),
+                        ("BTC-USDC", 456, 50, proto.OrderStatus.OS_PARTIAL_FILL, proto.Side.S_BID, 0.4, 0.2),
                     ]
                 )
 
         order_status_stream_mock.side_effect = side_effect_function
         time_mock.return_value = 1
 
-        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=test_private_key)
+        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=TEST_PRIVATE_KEY)
         await provider.connect()
 
         os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS")
@@ -171,10 +162,10 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
             client_order_i_d=123,
             fill_price=0.0,
             order_price=10,
-            order_status=OrderStatus.OS_FILLED,
+            order_status=proto.OrderStatus.OS_FILLED,
             quantity_released=0.3,
             quantity_remaining=0.2,
-            side=Side.S_ASK,
+            side=proto.Side.S_ASK,
             timestamp=1
         )], os1)
 
@@ -183,10 +174,10 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
             client_order_i_d=456,
             fill_price=0.0,
             order_price=50,
-            order_status=OrderStatus.OS_PARTIAL_FILL,
+            order_status=proto.OrderStatus.OS_PARTIAL_FILL,
             quantity_released=0.4,
             quantity_remaining=0.2,
-            side=Side.S_BID,
+            side=proto.Side.S_BID,
             timestamp=1
         )])
 
@@ -214,15 +205,15 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
 
             if market == "SOLUSDC":
                 return async_generator_order_status_stream([
-                    ("SOL/USDC", 123, 10, OrderStatus.OS_OPEN, Side.S_ASK, 0, 0.3),
-                    ("SOL/USDC", 123, 10, OrderStatus.OS_OPEN, Side.S_ASK, 0, 0.3),
-                    ("SOL/USDC", 123, 10, OrderStatus.OS_FILLED, Side.S_ASK, 0.3, 0),
+                    ("SOL/USDC", 123, 10, proto.OrderStatus.OS_OPEN, proto.Side.S_ASK, 0, 0.3),
+                    ("SOL/USDC", 123, 10, proto.OrderStatus.OS_OPEN, proto.Side.S_ASK, 0, 0.3),
+                    ("SOL/USDC", 123, 10, proto.OrderStatus.OS_FILLED, proto.Side.S_ASK, 0.3, 0),
                 ])
 
         order_status_stream_mock.side_effect = side_effect_function
         time_mock.return_value = 1
 
-        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=test_private_key)
+        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=TEST_PRIVATE_KEY)
         await provider.connect()
 
         os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS")
@@ -236,19 +227,19 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
                 client_order_i_d=123,
                 fill_price=0.0,
                 order_price=10,
-                order_status=OrderStatus.OS_OPEN,
+                order_status=proto.OrderStatus.OS_OPEN,
                 quantity_released=0,
                 quantity_remaining=0.3,
-                side=Side.S_ASK,
+                side=proto.Side.S_ASK,
                 timestamp=1
             ), OrderStatusInfo(
                 client_order_i_d=123,
                 fill_price=0.0,
                 order_price=10,
-                order_status=OrderStatus.OS_FILLED,
+                order_status=proto.OrderStatus.OS_FILLED,
                 quantity_released=0.3,
                 quantity_remaining=0.0,
-                side=Side.S_ASK,
+                side=proto.Side.S_ASK,
                 timestamp=1
             )])
 
@@ -272,13 +263,13 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
     ):
         order_status_stream_mock.return_value = async_generator_order_status_stream(
             [
-                ("SOL/USDC", 123, 11, OrderStatus.OS_PARTIAL_FILL, Side.S_ASK, 0.1, 0.1),
-                ("SOL/USDC", 123, 10, OrderStatus.OS_FILLED, Side.S_ASK, 0.1, 0),
+                ("SOL/USDC", 123, 11, proto.OrderStatus.OS_PARTIAL_FILL, proto.Side.S_ASK, 0.1, 0.1),
+                ("SOL/USDC", 123, 10, proto.OrderStatus.OS_FILLED, proto.Side.S_ASK, 0.1, 0),
             ]
         )
         time_mock.return_value = 1
 
-        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=test_private_key)
+        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=TEST_PRIVATE_KEY)
         await provider.connect()
 
         os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS")
@@ -292,20 +283,20 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
                 client_order_i_d=123,
                 fill_price=0.0,
                 order_price=11,
-                order_status=OrderStatus.OS_PARTIAL_FILL,
+                order_status=proto.OrderStatus.OS_PARTIAL_FILL,
                 quantity_released=0.1,
                 quantity_remaining=0.1,
-                side=Side.S_ASK,
+                side=proto.Side.S_ASK,
                 timestamp=1
             ),
             OrderStatusInfo(
                 client_order_i_d=123,
                 fill_price=0.0,
                 order_price=10,
-                order_status=OrderStatus.OS_FILLED,
+                order_status=proto.OrderStatus.OS_FILLED,
                 quantity_released=0.1,
                 quantity_remaining=0,
-                side=Side.S_ASK,
+                side=proto.Side.S_ASK,
                 timestamp=1
             )
         ]
@@ -330,13 +321,13 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
     ):
         order_status_stream_mock.return_value = async_generator_order_status_stream(
             [
-                ("SOL/USDC", 123, 11, OrderStatus.OS_PARTIAL_FILL, Side.S_ASK, 0.3, 0.2),
-                ("SOL/USDC", 456, 10, OrderStatus.OS_FILLED, Side.S_ASK, 0.4, 0.2),
+                ("SOL/USDC", 123, 11, proto.OrderStatus.OS_PARTIAL_FILL, proto.Side.S_ASK, 0.3, 0.2),
+                ("SOL/USDC", 456, 10, proto.OrderStatus.OS_FILLED, proto.Side.S_ASK, 0.4, 0.2),
             ]
         )
         time_mock.return_value = 1
 
-        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=test_private_key)
+        provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=TEST_PRIVATE_KEY)
         os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS")
         await os_manager.start()
         await asyncio.sleep(0.5)
@@ -346,10 +337,10 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
             client_order_i_d=123,
             fill_price=0.0,
             order_price=11,
-            order_status=OrderStatus.OS_PARTIAL_FILL,
+            order_status=proto.OrderStatus.OS_PARTIAL_FILL,
             quantity_released=0.3,
             quantity_remaining=0.2,
-            side=Side.S_ASK,
+            side=proto.Side.S_ASK,
             timestamp=1
         )])
 
@@ -358,35 +349,35 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
             client_order_i_d=456,
             fill_price=0.0,
             order_price=10,
-            order_status=OrderStatus.OS_FILLED,
+            order_status=proto.OrderStatus.OS_FILLED,
             quantity_released=0.4,
             quantity_remaining=0.2,
-            side=Side.S_ASK,
+            side=proto.Side.S_ASK,
             timestamp=1
         )])
 
         await os_manager.stop()
 
 
-def orders(price_and_sizes: List[Tuple[int, int]]) -> List[OrderbookItem]:
+def orders(price_and_sizes: List[Tuple[int, int]]) -> List[proto.OrderbookItem]:
     orderbook_items = []
     for price, size in price_and_sizes:
-        orderbook_items.append(OrderbookItem(price=price, size=size))
+        orderbook_items.append(proto.OrderbookItem(price=price, size=size))
 
     return orderbook_items
 
 
 async def async_generator_orderbook_stream(market, bids, asks) -> AsyncGenerator:
-    yield GetOrderbooksStreamResponse(slot=1, orderbook=GetOrderbookResponse(market=market, bids=bids, asks=asks))
+    yield proto.GetOrderbooksStreamResponse(slot=1, orderbook=proto.GetOrderbookResponse(market=market, bids=bids, asks=asks))
 
 
 async def async_generator_order_status_stream(
-    order_status_updates: List[Tuple[str, int, int, OrderStatus, Side, float, float]]
+    order_status_updates: List[Tuple[str, int, int, proto.OrderStatus, proto.Side, float, float]]
 ) -> AsyncGenerator:
     for market, client_order_id, order_price, order_status, side, q_rel, q_rem in order_status_updates:
-        yield GetOrderStatusStreamResponse(
+        yield proto.GetOrderStatusStreamResponse(
             slot=1,
-            order_info=GetOrderStatusResponse(
+            order_info=proto.GetOrderStatusResponse(
                 market=market, client_order_i_d=client_order_id, order_price=order_price, order_status=order_status,
                 side=side,
                 quantity_released=q_rel, quantity_remaining=q_rem
