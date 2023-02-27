@@ -1,7 +1,7 @@
 import asyncio
 import time
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from bidict import bidict
 from bxsolana.transaction import load_private_key, signing
@@ -65,7 +65,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         kp = load_private_key(self._sol_wallet_private_key)
         self._sol_wallet_public_key = str(kp.public_key)
 
-        self._order_id_mapper: Dict[str, int] = {}
+        self._order_id_mapper: Dict[str, int] = {}  # maps Hummingbot to bloXroute order id
         self._open_orders_address_mapper: Dict[str, str] = {}  # maps trading pair to open orders address
 
         self._token_accounts: Dict[str, str] = {}
@@ -82,11 +82,6 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
         super().__init__(client_config_map)
 
-    async def _initialize_order_manager(self):
-        await self._provider_connected.wait()
-        await self._order_manager.start()
-        await self._order_manager.ready()
-
     async def _initialize_token_accounts(self):
         await self._provider_connected.wait()
         token_accounts_response: api.GetTokenAccountsResponse = await self._provider.get_token_accounts(
@@ -100,6 +95,11 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                     if token not in token_account_dict:
                         raise Exception(f"token account for {token} does not exist")
                     self._token_accounts[token] = token_account_dict[token]
+
+    async def _initialize_order_manager(self):
+        await self._provider_connected.wait()
+        await self._order_manager.start()
+        await self._order_manager.ready()
 
     @property
     def name(self) -> str:
@@ -167,16 +167,13 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         await self._order_manager.ready()
 
         try:
-            self._server_response: api.GetServerTimeResponse = await self._provider.get_server_time()
-            if self._server_response.timestamp:
+            server_response: api.GetServerTimeResponse = await self._provider.get_server_time()
+            if server_response.timestamp:
                 return NetworkStatus.CONNECTED
             else:
                 return NetworkStatus.NOT_CONNECTED
         except Exception:
             return NetworkStatus.NOT_CONNECTED
-
-    async def _update_time_synchronizer(self, pass_on_non_cancelled_error: bool = False):
-        pass
 
     def get_price(self, trading_pair: str, is_buy: bool) -> Decimal:
         if self._order_manager.is_ready():
@@ -187,6 +184,9 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     def supported_order_types(self) -> List[OrderType]:
         return [OrderType.LIMIT]
+
+    async def _update_time_synchronizer(self, pass_on_non_cancelled_error: bool = False):
+        pass
 
     def _is_request_exception_related_to_time_synchronizer(self, request_exception: Exception):
         return "time" in str(request_exception)
@@ -244,15 +244,14 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         price: Decimal,
         **kwargs,
     ) -> Tuple[str, float]:
-        blxr_side = trade_type_to_side(trade_type)
         blxr_order_type = order_type_to_blxr_order_type(order_type)
+        blxr_side = trade_type_to_side(trade_type)
 
         tokens = trading_pair.split("-")
         base = tokens[0]
         quote = tokens[1]
 
-        payer_address = self._token_accounts[base] if blxr_side == api.Side.S_ASK else self._token_accounts[quote]
-
+        payer_address = self._payer_address(base, quote, blxr_side)
         open_orders_address = ""
         if trading_pair in self._open_orders_address_mapper:
             open_orders_address = self._open_orders_address_mapper[trading_pair]
@@ -284,6 +283,11 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
         return post_submit_response.signature, time.time()
 
+    def _payer_address(self, base, quote, blxr_side):
+        if blxr_side == api.Side.S_ASK:
+            return self._token_accounts[base]
+        return self._token_accounts[quote]
+
     async def _place_cancel(self, order_id: str, tracked_order: InFlightOrder):
         if order_id not in self._order_id_mapper:
             raise Exception("placed order not found")
@@ -291,20 +295,16 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         blxr_client_order_id = self._order_id_mapper[order_id]
         open_orders_address = self._open_orders_address_mapper[tracked_order.trading_pair]
 
-        try:
-            cancel_order_response = await self._provider.submit_cancel_by_client_order_i_d(
-                client_order_i_d=blxr_client_order_id,
-                market_address=tracked_order.trading_pair,
-                owner_address=self._sol_wallet_public_key,
-                open_orders_address=open_orders_address,
-                project=constants.SPOT_OPENBOOK_PROJECT,
-                skip_pre_flight=True,
-            )
+        cancel_order_response = await self._provider.submit_cancel_by_client_order_i_d(
+            owner_address=self._sol_wallet_public_key,
+            market_address=tracked_order.trading_pair,
+            open_orders_address=open_orders_address,
+            client_order_i_d=blxr_client_order_id,
+            project=constants.SPOT_OPENBOOK_PROJECT,
+            skip_pre_flight=True,
+        )
 
-            return cancel_order_response != ""
-        except Exception as e:
-            self.logger().error(e)
-            return False
+        return cancel_order_response != ""
 
     async def _format_trading_rules(self, markets_by_name: Dict[str, api.Market]) -> List[TradingRule]:
         trading_rules = []
@@ -407,7 +407,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             trading_pair=tracked_order.trading_pair, client_order_id=blxr_client_order_id
         )
 
-        timestamp = time.time()
+        timestamp = 0
         order_status = api.OrderStatus.OS_UNKNOWN
         if len(order_status_info) != 0:
             timestamp = order_status_info[-1].timestamp
@@ -464,19 +464,12 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         pass
 
 
-def convert_hummingbot_to_blxr_client_order_id(client_order_id: str):
-    num = _convert_to_number(client_order_id)
-    return truncate(num, 7)
+def convert_hummingbot_to_blxr_client_order_id(client_order_id: str) -> int:
+    return _convert_to_number(client_order_id)
 
 
 def _convert_to_number(s):
     return int.from_bytes(s.encode(), "little")
-
-
-def truncate(num: int, n: int) -> int:
-    num_str = str(num)
-    trunc_num_str = num_str[-n:]
-    return int(trunc_num_str)
 
 
 def convert_blxr_to_hummingbot_order_status(order_status: api.OrderStatus) -> OrderState:
