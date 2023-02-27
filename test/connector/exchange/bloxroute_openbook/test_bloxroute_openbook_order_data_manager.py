@@ -155,7 +155,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
 
         await asyncio.sleep(0.5)
 
-        os1 = os_manager.get_order_status("SOLUSDC", 123)
+        os1 = os_manager.get_order_statuses("SOLUSDC", 123)
         self.assertEqual(os1, [OrderStatusInfo(
             client_order_i_d=123,
             fill_price=0.0,
@@ -167,7 +167,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
             timestamp=1
         )])
 
-        os2 = os_manager.get_order_status("BTCUSDC", 456)
+        os2 = os_manager.get_order_statuses("BTCUSDC", 456)
         self.assertEqual(os2, [OrderStatusInfo(
             client_order_i_d=456,
             fill_price=0.0,
@@ -214,7 +214,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         await os_manager.start()
         await asyncio.sleep(0.5)
 
-        os = os_manager.get_order_status("SOLUSDC", 123)
+        os = os_manager.get_order_statuses("SOLUSDC", 123)
         self.assertListEqual(os, [
             OrderStatusInfo(
                 client_order_i_d=123,
@@ -265,7 +265,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         await os_manager.start()
         await asyncio.sleep(0.5)
 
-        os_updates: List[OrderStatusInfo] = os_manager.get_order_status("SOLUSDC", 123)
+        os_updates: List[OrderStatusInfo] = os_manager.get_order_statuses("SOLUSDC", 123)
         expected_os_updates = [
             OrderStatusInfo(
                 client_order_i_d=123,
@@ -320,7 +320,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         await os_manager.start()
         await asyncio.sleep(0.5)
 
-        os = os_manager.get_order_status("SOLUSDC", 123)
+        os = os_manager.get_order_statuses("SOLUSDC", 123)
         self.assertEqual(os, [OrderStatusInfo(
             client_order_i_d=123,
             fill_price=0.0,
@@ -332,7 +332,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
             timestamp=1
         )])
 
-        os2 = os_manager.get_order_status("SOLUSDC", 456)
+        os2 = os_manager.get_order_statuses("SOLUSDC", 456)
         self.assertEqual(os2, [OrderStatusInfo(
             client_order_i_d=456,
             fill_price=0.0,

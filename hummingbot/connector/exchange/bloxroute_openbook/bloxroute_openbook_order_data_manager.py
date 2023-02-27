@@ -165,15 +165,7 @@ class BloxrouteOpenbookOrderDataManager:
             updated = True
 
         if updated:
-            remaining = order_status_info.quantity_remaining
-            released = order_status_info.quantity_released
-            if order_status_info.side == api.Side.S_BID:
-                remaining = round(remaining / order_status_info.order_price, 2)
-                released = round(released / order_status_info.order_price, 2)
-            HummingbotApplication.main_application().notify(
-                f"order type {order_status_info.order_status.name} | quantity released: {released} | "
-                f"quantity remaining: {remaining} | price:  {order_status_info.order_price} | "
-                f"side: {order_status_info.side.name} | id {client_order_id}")
+            log_hummingbot(client_order_id, order_status_info)
 
     def get_order_book(self, trading_pair: str) -> (Orderbook, float):
         normalized_trading_pair = normalize_trading_pair(trading_pair)
@@ -195,7 +187,7 @@ class BloxrouteOpenbookOrderDataManager:
             else (ob_info.best_ask_price, ob_info.best_ask_size)
         )
 
-    def get_order_status(self, trading_pair: str, client_order_id: int) -> List[OrderStatusInfo]:
+    def get_order_statuses(self, trading_pair: str, client_order_id: int) -> List[OrderStatusInfo]:
         normalized_trading_pair = normalize_trading_pair(trading_pair)
         if normalized_trading_pair not in self._markets_to_order_statuses:
             raise Exception(f"order book manager does not support ${trading_pair}")
@@ -207,7 +199,21 @@ class BloxrouteOpenbookOrderDataManager:
         return []
 
 
+# supporting both Hummingbot and BloXroute trading pair formats
 def normalize_trading_pair(trading_pair: str):
     trading_pair = trading_pair.replace("-", "")
     trading_pair = trading_pair.replace("/", "")
     return trading_pair
+
+
+# logs the order info to the Hummingbot UI
+def log_hummingbot(client_order_id, order_status_info):
+    remaining = order_status_info.quantity_remaining
+    released = order_status_info.quantity_released
+    if order_status_info.side == api.Side.S_BID:
+        remaining = round(remaining / order_status_info.order_price, 2)
+        released = round(released / order_status_info.order_price, 2)
+    HummingbotApplication.main_application().notify(
+        f"order type {order_status_info.order_status.name} | quantity released: {released} | "
+        f"quantity remaining: {remaining} | price:  {order_status_info.order_price} | "
+        f"side: {order_status_info.side.name} | id {client_order_id}")
