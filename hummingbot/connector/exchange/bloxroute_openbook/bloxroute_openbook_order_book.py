@@ -1,6 +1,7 @@
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from bxsolana_trader_proto import GetOrderbookResponse
+from bxsolana_trader_proto import GetOrderbookResponse, api as api
 from bxsolana_trader_proto.api import OrderbookItem
 
 from hummingbot.core.data_type.order_book import OrderBook
@@ -8,37 +9,60 @@ from hummingbot.core.data_type.order_book_message import OrderBookMessage, Order
 from hummingbot.core.data_type.order_book_row import OrderBookRow
 
 
-class BloxrouteOpenbookOrderBook(OrderBook):
-    @classmethod
-    def snapshot_message_from_exchange(
-        cls, msg: Dict[str, any], timestamp: float, metadata: Optional[Dict] = None
-    ) -> OrderBookMessage:
-        """
-        Creates a snapshot message with the order book snapshot message
-        :param msg: the response from the exchange when requesting the order book snapshot
-        :param timestamp: the snapshot timestamp
-        :param metadata: a dictionary with extra information to add to the snapshot data
-        :return: a snapshot message with the snapshot information received from the exchange
-        """
+@dataclass
+class Orderbook:
+    asks: List[api.OrderbookItem]
+    bids: List[api.OrderbookItem]
 
+
+@dataclass
+class OrderbookInfo:
+    best_ask_price: float
+    best_ask_size: float
+    best_bid_price: float
+    best_bid_size: float
+    latest_order_book: Orderbook
+
+
+@dataclass
+class OrderStatusInfo:
+    order_status: api.OrderStatus
+    quantity_released: float
+    quantity_remaining: float
+    side: api.Side
+    fill_price: float
+    order_price: float
+    client_order_i_d: int
+    timestamp: float
+
+    def __eq__(self, other: "OrderStatusInfo"):
+        return (
+            self.order_status == other.order_status
+            and self.quantity_released == other.quantity_released
+            and self.quantity_remaining == other.quantity_remaining
+            and self.side == other.side
+            and self.fill_price == other.fill_price
+            and self.order_price == other.order_price
+            and self.client_order_i_d == other.client_order_i_d
+            and self.timestamp == other.timestamp
+        )
+
+
+class BloxrouteOpenbookOrderBook(OrderBook):
+    def apply_orderbook_snapshot(
+        self, msg: Dict[str, any], timestamp: float, metadata: Optional[Dict] = None
+    ):
         if msg["orderbook"]:
             if metadata:
                 msg.update(metadata)
             orderbook: GetOrderbookResponse = msg["orderbook"]
-            return OrderBookMessage(
-                OrderBookMessageType.SNAPSHOT,
-                {
-                    "trading_pair": msg["trading_pair"],
-                    "trade_id": timestamp,
-                    "update_id": timestamp,
-                    "bids": orders_to_orderbook_rows(orderbook.bids),
-                    "asks": orders_to_orderbook_rows(orderbook.asks),
-                },
-                timestamp=timestamp,
+            self.apply_snapshot(
+                asks=orders_to_orderbook_rows(orderbook.asks),
+                bids=orders_to_orderbook_rows(orderbook.bids),
+                update_id=int(timestamp),
             )
         else:
             raise Exception(f"orderbook snapshot update did not contain `orderbook` field: {msg}")
-
 
 def orders_to_orderbook_rows(orders: List[OrderbookItem]) -> List[OrderBookRow]:
     orderbook_rows = []

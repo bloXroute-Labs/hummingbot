@@ -1,31 +1,14 @@
 import asyncio
-import math
 import time
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from bidict import bidict
-from bxsolana import Provider
-from bxsolana.provider import WsProvider
-from bxsolana.transaction import signing
+from bxsolana.transaction import load_private_key, signing
 from bxsolana_trader_proto import GetMarketsResponse, api
-from bxsolana_trader_proto.api import (
-    GetAccountBalanceResponse,
-    GetQuotesResponse,
-    GetServerTimeResponse,
-    GetTokenAccountsResponse,
-    Market,
-    OrderStatus,
-    Side,
-    TransactionMessage,
-)
 
-from hummingbot.client.hummingbot_application import HummingbotApplication
 from hummingbot.connector.constants import s_decimal_NaN
-from hummingbot.connector.exchange.bloxroute_openbook import (
-    bloxroute_openbook_constants as CONSTANTS,
-    bloxroute_openbook_web_utils as web_utils,
-)
+from hummingbot.connector.exchange.bloxroute_openbook import bloxroute_openbook_constants as constants
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_order_book_data_source import (
     BloxrouteOpenbookAPIOrderBookDataSource,
 )
@@ -36,6 +19,9 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constan
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import BloxrouteOpenbookOrderBook
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_data_manager import (
     BloxrouteOpenbookOrderDataManager,
+)
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider import (
+    BloxrouteOpenbookProviderManager,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_utils import (
     order_type_to_blxr_order_type,
@@ -48,7 +34,7 @@ from hummingbot.core.data_type.common import OrderType, TradeType
 from hummingbot.core.data_type.in_flight_order import InFlightOrder, OrderState, OrderUpdate, TradeUpdate
 from hummingbot.core.data_type.order_book import OrderBook, OrderBookMessage
 from hummingbot.core.data_type.order_book_tracker_data_source import OrderBookTrackerDataSource
-from hummingbot.core.data_type.trade_fee import AddedToCostTradeFee, DeductedFromReturnsTradeFee, TradeFeeBase
+from hummingbot.core.data_type.trade_fee import DeductedFromReturnsTradeFee, TradeFeeBase
 from hummingbot.core.data_type.user_stream_tracker_data_source import UserStreamTrackerDataSource
 from hummingbot.core.network_iterator import NetworkStatus
 from hummingbot.core.web_assistant.auth import AuthBase
@@ -58,22 +44,12 @@ from hummingbot.core.web_assistant.web_assistants_factory import WebAssistantsFa
 if TYPE_CHECKING:
     from hummingbot.client.config.config_helpers import ClientConfigAdapter
 
-s_logger = None
-
 
 class BloxrouteOpenbookExchange(ExchangePyBase):
-    """
-    BloxrouteOpenbookExchange connects with BloxRoute Labs Solana Trader API provides order book pricing, user account tracking and
-    trading functionality.
-    """
-
-    web_utils = web_utils
-
     def __init__(
         self,
         client_config_map: "ClientConfigAdapter",
         bloxroute_auth_header: str,
-        solana_wallet_public_key: str,
         solana_wallet_private_key: str,
         trading_pairs: Optional[List[str]] = None,
         trading_required: bool = True,
@@ -85,28 +61,25 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         :param trading_required: Whether actual trading is needed.
         """
 
-        self.logger().exception("Creating bloXroute exchange")
-        self.logger().exception("API Key is " + bloxroute_auth_header)
-        self.logger().exception("Public Key is " + solana_wallet_public_key)
-        self.logger().exception("Private Key is " + solana_wallet_private_key)
+        self.logger().info("Creating bloXroute exchange")
 
         self._auth_header = bloxroute_auth_header
-        self._sol_wallet_public_key = solana_wallet_public_key
-        self._sol_wallet_private_key = solana_wallet_private_key
-        self._trading_required = trading_required
-        self._hummingbot_to_solana_id = {}
-        self._open_orders_addresses: Dict[str, str] = {}
 
-        self._server_response = GetServerTimeResponse
-        endpoint = CONSTANTS.WS_URL
-        self._provider_1: Provider = WsProvider(endpoint=endpoint, auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
-        self._provider_2: Provider = WsProvider(endpoint=endpoint, auth_header=self._auth_header, private_key=self._sol_wallet_private_key)
+        self._sol_wallet_private_key = solana_wallet_private_key
+        kp = load_private_key(self._sol_wallet_private_key)
+        self._sol_wallet_public_key = str(kp.public_key)
+
+        self._trading_required = trading_required
+        self._order_id_mapper = {}
+        self._trading_pair_open_orders_address_map: Dict[str, str] = {}
+
+        self._provider = BloxrouteOpenbookProviderManager(endpoint=constants.WS_URL, auth_header=self._auth_header,
+                                                          private_key=self._sol_wallet_private_key)
 
         self._trading_pairs = trading_pairs
         self._order_manager: BloxrouteOpenbookOrderDataManager = BloxrouteOpenbookOrderDataManager(
-            self._provider_2, self._trading_pairs, self._sol_wallet_public_key
+            self._provider, self._trading_pairs, self._sol_wallet_public_key
         )
-        self._order_book_manager_connected = False
         asyncio.create_task(self._initialize_order_manager())
 
         self._token_accounts: Dict[str, str] = {}
@@ -115,9 +88,15 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         super().__init__(client_config_map)
         self.real_time_balance_update = False
 
+    async def _initialize_order_manager(self):
+        await self._provider_connected.wait()
+        await self._order_manager.start()
+        await self._order_manager.ready()
+
     async def _initialize_token_accounts(self):
-        await self._provider_1.connect()
-        token_accounts_response: GetTokenAccountsResponse = await self._provider_1.get_token_accounts(owner_address=self._sol_wallet_public_key)
+        await self._provider_connected.wait()
+        token_accounts_response: api.GetTokenAccountsResponse = await self._provider.get_token_accounts(
+            owner_address=self._sol_wallet_public_key)
         token_account_dict = {token.symbol: token.token_account for token in token_accounts_response.accounts}
 
         for trading_pair in self._trading_pairs:
@@ -128,64 +107,19 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                         raise Exception(f"token account for {token} does not exist")
                     self._token_accounts[token] = token_account_dict[token]
 
-    async def _initialize_order_manager(self):
-        await self._order_manager.start()
-        self._order_book_manager_connected = True
-
-        print("order books initialized!")
-
-    def _api_request(
-            self,
-            path_url,
-            overwrite_url: Optional[str] = None,
-            method: RESTMethod = RESTMethod.GET,
-            params: Optional[Dict[str, Any]] = None,
-            data: Optional[Dict[str, Any]] = None,
-            is_auth_required: bool = False,
-            return_err: bool = False,
-            limit_id: Optional[str] = None,
-            **kwargs,
-    ) -> Dict[str, Any]:
-        pass
-
-    def authenticator(self):
-        return AuthBase()
+        print("bloXroute order books initialized")
 
     @property
     def name(self) -> str:
-        return CONSTANTS.EXCHANGE_NAME
-
-    async def check_network(self) -> NetworkStatus:
-        await self._provider_1.connect()
-        await self._order_manager.start()
-
-        try:
-            self._server_response: GetServerTimeResponse = await self._provider_1.get_server_time()
-            if self._server_response.timestamp:
-                return NetworkStatus.CONNECTED
-            else:
-                return NetworkStatus.NOT_CONNECTED
-        except Exception:
-            return NetworkStatus.NOT_CONNECTED
-
-    async def _update_time_synchronizer(self, pass_on_non_cancelled_error: bool = False):
-        pass
+        return constants.EXCHANGE_NAME
 
     @property
     def status_dict(self) -> Dict[str, bool]:
         return {
-            "order_books_initialized": self._order_book_manager_connected,
+            "order_books_initialized": self._order_manager.is_ready,
+            "account_balance": not self.is_trading_required or len(self._account_balances) > 0,
             "trading_rule_initialized": len(self._trading_rules) != 0,
         }
-
-    def get_price(self, trading_pair: str, is_buy: bool) -> Decimal:
-        if self._order_manager.is_ready:
-            price, _ = self._order_manager.get_price_with_opportunity_size(trading_pair=trading_pair, is_buy=is_buy)
-            return Decimal(price)
-        else:
-            if not self._order_manager.started:
-                asyncio.create_task(self._initialize_order_manager())
-            return Decimal(0)
 
     @property
     def rate_limits_rules(self):
@@ -219,6 +153,48 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     def is_trading_required(self) -> bool:
         return self._trading_required
 
+    def _api_request(
+        self,
+        path_url,
+        overwrite_url: Optional[str] = None,
+        method: RESTMethod = RESTMethod.GET,
+        params: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+        is_auth_required: bool = False,
+        return_err: bool = False,
+        limit_id: Optional[str] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        pass
+
+    def authenticator(self):
+        return AuthBase()
+
+    async def check_network(self) -> NetworkStatus:
+        await self._provider_connected.wait()
+        await self._order_manager.ready()
+
+        try:
+            self._server_response: api.GetServerTimeResponse = await self._provider.get_server_time()
+            if self._server_response.timestamp:
+                return NetworkStatus.CONNECTED
+            else:
+                return NetworkStatus.NOT_CONNECTED
+        except Exception:
+            return NetworkStatus.NOT_CONNECTED
+
+    async def _update_time_synchronizer(self, pass_on_non_cancelled_error: bool = False):
+        pass
+
+    def get_price(self, trading_pair: str, is_buy: bool) -> Decimal:
+        if self._order_manager.is_ready():
+            price, _ = self._order_manager.get_price_with_opportunity_size(trading_pair=trading_pair, is_buy=is_buy)
+            return Decimal(price)
+        else:
+            if not self._order_manager.started:
+                asyncio.create_task(self._initialize_order_manager())
+            return Decimal(0)
+
     def supported_order_types(self) -> List[OrderType]:
         """
         :return a list of OrderType supported by this connector.
@@ -234,21 +210,14 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     def _create_order_book_data_source(self) -> OrderBookTrackerDataSource:
         return BloxrouteOpenbookAPIOrderBookDataSource(
-            provider=self._provider_1, trading_pairs=self._trading_pairs, connector=self
+            provider=self._provider, trading_pairs=self._trading_pairs, connector=self
         )
 
     def get_order_book(self, trading_pair: str) -> OrderBook:
         blxr_ob, timestamp = self._order_manager.get_order_book(trading_pair)
-        snapshot_msg: OrderBookMessage = BloxrouteOpenbookOrderBook.snapshot_message_from_exchange(
-            msg={
-                "orderbook": blxr_ob,
-            },
-            timestamp=timestamp,
-            metadata={"trading_pair": trading_pair},
-        )
 
         ob = BloxrouteOpenbookOrderBook()
-        ob.apply_snapshot(snapshot_msg.bids, snapshot_msg.asks, snapshot_msg.update_id)
+        ob.apply_orderbook_snapshot(blxr_ob, timestamp)
 
         return ob
 
@@ -292,28 +261,28 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         price: Decimal,
         **kwargs,
     ) -> Tuple[str, float]:
-        side = trade_type_to_side(trade_type)
-        type = order_type_to_blxr_order_type(order_type)
+        blxr_side = trade_type_to_side(trade_type)
+        blxr_order_type = order_type_to_blxr_order_type(order_type)
 
         tokens = trading_pair.split("-")
         base = tokens[0]
         quote = tokens[1]
 
-        payer_address = self._token_accounts[base] if side == api.Side.S_ASK else self._token_accounts[quote]
+        payer_address = self._token_accounts[base] if blxr_side == api.Side.S_ASK else self._token_accounts[quote]
 
         open_orders_address = ""
-        if trading_pair in self._open_orders_addresses:
-            open_orders_address = self._open_orders_addresses[trading_pair]
+        if trading_pair in self._trading_pair_open_orders_address_map:
+            open_orders_address = self._trading_pair_open_orders_address_map[trading_pair]
 
         blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(order_id)
-        self._hummingbot_to_solana_id[order_id] = blxr_client_order_id
+        self._order_id_mapper[order_id] = blxr_client_order_id
 
-        post_order_response = await self._provider_1.post_order(
+        post_order_response = await self._provider.post_order(
             owner_address=self._sol_wallet_public_key,
             payer_address=payer_address,
             market=trading_pair,
-            side=side,
-            type=[type],
+            side=blxr_side,
+            type=[blxr_order_type],
             amount=float(amount),
             price=float(price),
             open_orders_address=open_orders_address,
@@ -322,26 +291,25 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         )
 
         signed_tx = signing.sign_tx(post_order_response.transaction.content)
-        post_submit_response = await self._provider_1.post_submit(
-            transaction=TransactionMessage(content=signed_tx),
+        post_submit_response = await self._provider.post_submit(
+            transaction=api.TransactionMessage(content=signed_tx),
             skip_pre_flight=True,
         )
 
-        self.logger().info(f"placed order {post_submit_response.signature} with id {blxr_client_order_id}: {amount} @ {price}")
-
         if open_orders_address == "":
-            self._open_orders_addresses[trading_pair] = open_orders_address
+            self._trading_pair_open_orders_address_map[trading_pair] = open_orders_address
 
         return post_submit_response.signature, time.time()
 
     async def _place_cancel(self, order_id: str, tracked_order: InFlightOrder):
-        if order_id not in self._hummingbot_to_solana_id:
+        if order_id not in self._order_id_mapper:
             raise Exception("placed order not found")
-        blxr_client_order_id = self._hummingbot_to_solana_id[order_id]
 
-        open_orders_address = self._open_orders_addresses[tracked_order.trading_pair]
+        blxr_client_order_id = self._order_id_mapper[order_id]
+        open_orders_address = self._trading_pair_open_orders_address_map[tracked_order.trading_pair]
+
         try:
-            cancel_order_response = await self._provider_1.submit_cancel_by_client_order_i_d(
+            cancel_order_response = await self._provider.submit_cancel_by_client_order_i_d(
                 client_order_i_d=blxr_client_order_id,
                 market_address=tracked_order.trading_pair,
                 owner_address=self._sol_wallet_public_key,
@@ -350,13 +318,12 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                 skip_pre_flight=True,
             )
 
-            self.logger().info(f"cancelled order f{cancel_order_response} with id {blxr_client_order_id}")
             return cancel_order_response != ""
         except Exception as e:
-            print(e)
+            self.logger().error(e)
             return False
 
-    async def _format_trading_rules(self, markets_by_name: Dict[str, Market]) -> List[TradingRule]:
+    async def _format_trading_rules(self, markets_by_name: Dict[str, api.Market]) -> List[TradingRule]:
         trading_rules = []
         for market_name in markets_by_name:
             market = markets_by_name[market_name]
@@ -366,8 +333,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
             quantity_precision = market.base_decimals
             price_precision = market.quote_decimals
-            min_order_size = Decimal(str(10**-quantity_precision))
-            min_quote_amount = Decimal(str(10**-price_precision))
+            min_order_size = Decimal(str(10 ** -quantity_precision))
+            min_quote_amount = Decimal(str(10 ** -price_precision))
             trading_rules.append(
                 TradingRule(
                     trading_pair=trading_pair,
@@ -404,8 +371,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         pass
 
     async def _update_balances(self):
-        await self._provider_1.connect()
-        account_balance: GetAccountBalanceResponse = await self._provider_1.get_account_balance(
+        await self._provider.connect()
+        account_balance: api.GetAccountBalanceResponse = await self._provider.get_account_balance(
             owner_address=self._sol_wallet_public_key
         )
         for token_info in account_balance.tokens:
@@ -423,25 +390,24 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     async def _all_trade_updates_for_order(self, order: InFlightOrder) -> List[TradeUpdate]:
         blxr_client_order_i_d = convert_hummingbot_to_blxr_client_order_id(order.client_order_id)
-        await asyncio.sleep(2)
         order_updates = self._order_manager.get_order_status(
             trading_pair=order.trading_pair, client_order_id=blxr_client_order_i_d
         )
         trade_updates = []
         for order_update in order_updates:
             if (
-                order_update.order_status == OrderStatus.OS_FILLED
-                or order_update.order_status == OrderStatus.OS_PARTIAL_FILL
+                order_update.order_status == api.OrderStatus.OS_FILLED
+                or order_update.order_status == api.OrderStatus.OS_PARTIAL_FILL
             ):
                 side = order_update.side
                 fill_price = Decimal(order_update.fill_price)
                 fill_base_amount: Decimal = Decimal(0)
                 fill_quote_amount: Decimal = Decimal(0)
 
-                if side == Side.S_ASK:
+                if side == api.Side.S_ASK:
                     fill_base_amount = Decimal(order_update.quantity_released)
                     fill_quote_amount = Decimal(fill_base_amount) * fill_price
-                elif side == Side.S_BID:
+                elif side == api.Side.S_BID:
                     fill_quote_amount = Decimal(order_update.quantity_released)
                     fill_base_amount = Decimal(fill_quote_amount) * (1 / fill_price)
 
@@ -472,7 +438,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         )
 
         timestamp = time.time()
-        order_status = OrderStatus.OS_UNKNOWN
+        order_status = api.OrderStatus.OS_UNKNOWN
         if len(order_status_info) != 0:
             timestamp = order_status_info[-1].timestamp
             order_status = order_status_info[-1].order_status
@@ -489,7 +455,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     async def _user_stream_event_listener(self):
         pass
 
-    def _initialize_trading_pair_symbols_from_exchange_info(self, markets_by_name: Dict[str, Market]):
+    def _initialize_trading_pair_symbols_from_exchange_info(self, markets_by_name: Dict[str, api.Market]):
         mapping = bidict()
 
         for market_name in markets_by_name:
@@ -509,27 +475,12 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._set_trading_pair_symbol_map(mapping)
 
     async def _get_last_traded_price(self, trading_pair: str) -> float:
-        seperator = ""
-        if "-" in trading_pair:
-            seperator = "-"
-        elif "/" in trading_pair:
-            seperator = "/"
-        else:
-            raise Exception("trading pair has no `-` or `/` seperator")
-        split_token = trading_pair.split(seperator)
-        in_token = split_token[0]
-        out_token = split_token[1]
-
-        quotes_response: GetQuotesResponse = await self._provider_1.get_quotes(
-            in_token=in_token, out_token=out_token, in_amount=1, slippage=0.05, limit=1, projects=[SPOT_OPENBOOK_PROJECT]
-        )
-        quotes = quotes_response.quotes[-1]
-        routes = quotes.routes[-1]
-        return routes.out_amount  # this is the price
+        price, _ = self._order_manager.get_price_with_opportunity_size(trading_pair=trading_pair, is_buy=False)
+        return price
 
     async def _update_trading_rules(self):
-        await self._provider_1.connect()
-        markets_response: GetMarketsResponse = await self._provider_1.get_markets()
+        await self._provider.connect()
+        markets_response: GetMarketsResponse = await self._provider.get_markets()
         markets_by_name = markets_response.markets
 
         trading_rules_list = await self._format_trading_rules(markets_by_name)

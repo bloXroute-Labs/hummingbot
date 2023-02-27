@@ -3,94 +3,26 @@ import time
 from asyncio import Task
 from typing import Dict, List, Optional
 
-from bxsolana.provider import Provider
-from bxsolana_trader_proto.api import GetOrderbookResponse, GetOrderStatusResponse, OrderbookItem, OrderStatus, Side
+import bxsolana_trader_proto.api as api
 
 from hummingbot.client.hummingbot_application import HummingbotApplication
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import SPOT_OPENBOOK_PROJECT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import (
+    Orderbook,
+    OrderbookInfo,
+    OrderStatusInfo,
+)
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider import (
+    BloxrouteOpenbookProviderManager,
+)
 
-
-class Orderbook:
-    asks: List[OrderbookItem]
-    bids: List[OrderbookItem]
-
-    def __init__(self, asks: List[OrderbookItem], bids: List[OrderbookItem]):
-        self.asks = asks
-        self.bids = bids
-
-
-class OrderbookInfo:
-    best_ask_price: float = 0
-    best_ask_size: float = 0
-    best_bid_price: float = 0
-    best_bid_size: float = 0
-    latest_order_book: Orderbook
-
-    def __init__(
-        self,
-        best_ask_price: float,
-        best_ask_size: float,
-        best_bid_price: float,
-        best_bid_size: float,
-        latest_order_book: Orderbook,
-        timestamp: float
-    ):
-        self.best_ask_price = best_ask_price
-        self.best_ask_size = best_ask_size
-        self.best_bid_price = best_bid_price
-        self.best_bid_size = best_bid_size
-        self.latest_order_book = latest_order_book
-        self.timestamp = timestamp
-
-
-class OrderStatusInfo:
-    order_status: OrderStatus
-    quantity_released: float
-    quantity_remaining: float
-    side: Side
-    fill_price: float
-    order_price: float
-    client_order_i_d: int
-    timestamp: float
-
-    def __init__(
-        self,
-        order_status: OrderStatus,
-        quantity_released: float,
-        quantity_remaining: float,
-        side: Side,
-        fill_price: float,
-        order_price: float,
-        client_order_i_d: int,
-        timestamp: float,
-    ):
-        self.order_status = order_status
-        self.quantity_released = quantity_released
-        self.quantity_remaining = quantity_remaining
-        self.side = side
-        self.fill_price = fill_price
-        self.order_price = order_price
-        self.client_order_i_d = client_order_i_d
-        self.timestamp = timestamp
-
-    def __eq__(self, other: "OrderStatusInfo"):
-        return (
-            self.order_status == other.order_status
-            and self.quantity_released == other.quantity_released
-            and self.quantity_remaining == other.quantity_remaining
-            and self.side == other.side
-            and self.fill_price == other.fill_price
-            and self.order_price == other.order_price
-            and self.client_order_i_d == other.client_order_i_d
-            and self.timestamp == other.timestamp
-        )
+ORDERBOOK_RETRIES = 5
 
 
 class BloxrouteOpenbookOrderDataManager:
-    def __init__(self, provider: Provider, trading_pairs: List[str], owner_address: str, start_timeout: int = 10):
+    def __init__(self, provider: BloxrouteOpenbookProviderManager, trading_pairs: List[str], owner_address: str):
         self._provider = provider
         self._owner_address = owner_address
-        self._start_timeout = start_timeout
 
         for index, trading_pair in enumerate(trading_pairs):
             trading_pairs[index] = normalize_trading_pair(trading_pair)
@@ -99,9 +31,10 @@ class BloxrouteOpenbookOrderDataManager:
         self._order_books: Dict[str, OrderbookInfo] = {}
         self._markets_to_order_statuses: Dict[str, Dict[int, List[OrderStatusInfo]]] = {}
 
-        self._started = False
+        self._started = asyncio.Event()
         self._ready = asyncio.Event()
-        self._is_ready = False
+
+        self._start_lock = asyncio.Lock()
 
         self._orderbook_polling_task: Optional[Task] = None
         self._order_status_running_tasks: List[Task] = []
@@ -112,24 +45,26 @@ class BloxrouteOpenbookOrderDataManager:
 
     @property
     def is_ready(self):
-        return self._is_ready
+        return self._ready.is_set()
 
     @property
     def started(self):
-        return self._started
+        return self._started.is_set()
 
     async def start(self):
-        if not self._started:
-            self._started = True
+        await self._start_lock.acquire()
+
+        if not self._started.is_set():
+            self._started.set()
+
             await self._initialize_order_books()
             self._orderbook_polling_task = asyncio.create_task(self._poll_order_book_updates())
 
             await self._initialize_order_status_streams()
 
-            await asyncio.sleep(self._start_timeout)
-
-            self._is_ready = True
             self._ready.set()
+
+        self._start_lock.release()
 
     async def stop(self):
         await self._provider.close()
@@ -142,11 +77,12 @@ class BloxrouteOpenbookOrderDataManager:
         self._order_status_running_tasks.clear()
 
     async def _initialize_order_books(self):
-        await self._provider.connect()
+        await self._provider.wait_connect()
         for trading_pair in self._trading_pairs:
             initialized = False
-            for i in range(5):
-                blxr_orderbook = await self._provider.get_orderbook(market=trading_pair, limit=5, project=SPOT_OPENBOOK_PROJECT)
+            for i in range(ORDERBOOK_RETRIES):
+                blxr_orderbook = await self._provider.get_orderbook(market=trading_pair, limit=5,
+                                                                    project=SPOT_OPENBOOK_PROJECT)
                 if blxr_orderbook.market != "":
                     self._apply_order_book_update(blxr_orderbook)
                     initialized = True
@@ -165,7 +101,6 @@ class BloxrouteOpenbookOrderDataManager:
             self._order_status_running_tasks.append(initialize_order_stream_task)
 
     async def _poll_order_book_updates(self):
-        await self._provider.connect()
         order_book_stream = self._provider.get_orderbooks_stream(
             markets=self._trading_pairs, limit=5, project=SPOT_OPENBOOK_PROJECT
         )
@@ -174,20 +109,18 @@ class BloxrouteOpenbookOrderDataManager:
             self._apply_order_book_update(order_book_update.orderbook)
 
     async def _poll_order_status_updates(self, trading_pair: str):
-        await self._provider.connect()
         order_status_stream = self._provider.get_order_status_stream(
             market=trading_pair, owner_address=self._owner_address, project=SPOT_OPENBOOK_PROJECT
         )
 
-        while True:
-            order_status_update = await order_status_stream.__anext__()
+        async for order_status_update in order_status_stream:
             self._apply_order_status_update(order_status_update.order_info)
 
-    def _apply_order_book_update(self, update: GetOrderbookResponse):
+    def _apply_order_book_update(self, update: api.GetOrderbookResponse):
         normalized_trading_pair = normalize_trading_pair(update.market)
 
-        best_ask = update.asks[0] if update.asks else OrderbookItem(price=0, size=0)
-        best_bid = update.bids[-1] if update.bids else OrderbookItem(price=0, size=0)
+        best_ask = update.asks[0] if update.asks else api.OrderbookItem(price=0, size=0)
+        best_bid = update.bids[-1] if update.bids else api.OrderbookItem(price=0, size=0)
 
         best_ask_price = best_ask.price
         best_ask_size = best_ask.size
@@ -204,12 +137,11 @@ class BloxrouteOpenbookOrderDataManager:
                     best_bid_price=best_bid_price,
                     best_bid_size=best_bid_size,
                     latest_order_book=latest_order_book,
-                    timestamp=time.time()
                 )
             }
         )
 
-    def _apply_order_status_update(self, os_update: GetOrderStatusResponse):
+    def _apply_order_status_update(self, os_update: api.GetOrderStatusResponse):
         normalized_trading_pair = normalize_trading_pair(os_update.market)
         if normalized_trading_pair not in self._markets_to_order_statuses:
             raise Exception(f"order manager does not support updates for ${normalized_trading_pair}")
@@ -229,7 +161,8 @@ class BloxrouteOpenbookOrderDataManager:
 
         updated = False
         if client_order_id in order_statuses:
-            if order_statuses[client_order_id][-1].order_status != os_update.order_status or order_statuses[client_order_id][-1].quantity_remaining != os_update.quantity_remaining:
+            if order_statuses[client_order_id][-1].order_status != os_update.order_status or \
+                order_statuses[client_order_id][-1].quantity_remaining != os_update.quantity_remaining:
                 order_statuses[client_order_id].append(order_status_info)
                 updated = True
         else:
@@ -239,12 +172,13 @@ class BloxrouteOpenbookOrderDataManager:
         if updated:
             remaining = order_status_info.quantity_remaining
             released = order_status_info.quantity_released
-            if order_status_info.side == Side.S_BID:
+            if order_status_info.side == api.Side.S_BID:
                 remaining = round(remaining / order_status_info.order_price, 2)
                 released = round(released / order_status_info.order_price, 2)
-            HummingbotApplication.main_application().notify(f"order type {order_status_info.order_status.name} | quantity released: {released} | "
-                                                            f"quantity remaining: {remaining} | price:  {order_status_info.order_price} | "
-                                                            f"side: {order_status_info.side.name} | id {client_order_id}")
+            HummingbotApplication.main_application().notify(
+                f"order type {order_status_info.order_status.name} | quantity released: {released} | "
+                f"quantity remaining: {remaining} | price:  {order_status_info.order_price} | "
+                f"side: {order_status_info.side.name} | id {client_order_id}")
 
     def get_order_book(self, trading_pair: str) -> (Orderbook, float):
         normalized_trading_pair = normalize_trading_pair(trading_pair)

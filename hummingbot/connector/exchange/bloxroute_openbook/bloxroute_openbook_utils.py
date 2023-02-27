@@ -32,16 +32,6 @@ class BloXrouteConnectorMap(BaseConnectorConfigMap):
         ),
     )
 
-    solana_wallet_public_key: SecretStr = Field(
-        default=...,
-        client_data=ClientFieldData(
-            prompt=lambda cm: "Enter your solana wallet public key",
-            is_secure=True,
-            is_connect_key=True,
-            prompt_on_new=True,
-        ),
-    )
-
     solana_wallet_private_key: SecretStr = Field(
         default=...,
         client_data=ClientFieldData(

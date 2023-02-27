@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import aiounittest
 import bxsolana.provider.grpc
 from bxsolana import Provider
+from bxsolana.provider.constants import LOCAL_API_WS
 from bxsolana_trader_proto import (
     GetOrderbookResponse,
     GetOrderbooksStreamResponse,
@@ -15,11 +16,12 @@ from bxsolana_trader_proto import (
     OrderStatus,
     Side,
 )
+from bxsolana_trader_proto.common import OrderType
 
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import SPOT_OPENBOOK_PROJECT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import OrderStatusInfo
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_data_manager import (
     BloxrouteOpenbookOrderDataManager,
-    OrderStatusInfo,
 )
 
 test_private_key = "3771ddf5dd1d38ff72334b9763dc3cbc6fc3196f23e651f391fe65e31e466e3d"
@@ -40,7 +42,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
             asks=asks,
         )
 
-        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], test_owner_address, start_timeout=0)
+        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], test_owner_address)
         await ob_manager.start()
 
         ob, timestamp = ob_manager.get_order_book("SOLUSDC")
@@ -68,7 +70,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
             asks=asks,
         )
 
-        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], test_owner_address, start_timeout=0)
+        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], test_owner_address)
         await ob_manager.start()
 
         ob, timestamp = ob_manager.get_order_book("SOLUSDC")
@@ -100,7 +102,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         new_asks = orders([(14, 3), (16, 4)])
         orderbook_stream_mock.return_value = async_generator_orderbook_stream("SOLUSDC", new_bids, new_asks)
 
-        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], test_owner_address, start_timeout=0)
+        ob_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC"], test_owner_address)
         await ob_manager.start()
 
         ob, timestamp = ob_manager.get_order_book("SOLUSDC")
@@ -145,7 +147,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         time_mock.return_value = 1
 
         provider = bxsolana.provider.GrpcProvider(auth_header="", private_key=test_private_key)
-        os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS", start_timeout=0)
+        os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS")
         await os_manager.start()
 
         os1 = os_manager.get_order_status("SOLUSDC", 123)
@@ -205,7 +207,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         time_mock.return_value = 1
 
         provider = bxsolana.provider.GrpcProvider(auth_header="", private_key=test_private_key)
-        os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS", start_timeout=0)
+        os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS")
         await os_manager.start()
 
         os = os_manager.get_order_status("SOLUSDC", 123)
@@ -257,7 +259,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         )
         time_mock.return_value = 1
 
-        os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS", start_timeout=0)
+        os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS")
         await os_manager.start()
 
         os_updates: List[OrderStatusInfo] = os_manager.get_order_status("SOLUSDC", 123)
@@ -313,7 +315,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         )
         time_mock.return_value = 1
 
-        os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS", start_timeout=0)
+        os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS")
         await os_manager.start()
 
         os = os_manager.get_order_status("SOLUSDC", 123)
@@ -341,6 +343,31 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         )])
 
         await os_manager.stop()
+
+    async def test_order_status_stream_forreal(self):
+        auth_header = "YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz"
+        private_key = "3mvTYCLXLM3e2oucFQCtGbtR4bHkEDAJcSkq45mRVNuP7xtpvS5nGMBsHZYVRNHGqiktoBEBBdcvgGASU1DTodPM"
+        owner_address = "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5"
+        market = "SOLUSDC"
+
+        provider = bxsolana.provider.WsProvider(
+            endpoint=LOCAL_API_WS,
+            auth_header=auth_header,
+            private_key=private_key)
+        await provider.connect()
+
+    def test_async_for(self):
+        auth_header = "YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz"
+        private_key = "3mvTYCLXLM3e2oucFQCtGbtR4bHkEDAJcSkq45mRVNuP7xtpvS5nGMBsHZYVRNHGqiktoBEBBdcvgGASU1DTodPM"
+        p = bxsolana.provider.WsProvider(
+            endpoint=LOCAL_API_WS,
+            auth_header=auth_header,
+            private_key=private_key
+        )
+
+        s = p.get_order_status_stream(market="SOLUSDC", owner_address="")
+
+
 
 def orders(price_and_sizes: List[Tuple[int, int]]) -> List[OrderbookItem]:
     orderbook_items = []
