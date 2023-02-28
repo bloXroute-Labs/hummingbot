@@ -70,15 +70,18 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                                                    private_key=self._sol_wallet_private_key)
         asyncio.create_task(self._provider.connect())
 
-        self._token_accounts: Dict[str, str] = {}
+        self._token_accounts: Dict[str, str] = {
+            "SOL": "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5",
+            "USDC": "Hse4dWHfnExzZ6mZkfNjs8BW45YZURHsWiHzssDMNjQ8"
+        }
+
         self._trading_pairs = trading_pairs
-        asyncio.create_task(self._initialize_token_accounts())
+        # asyncio.create_task(self._initialize_token_accounts())
 
         self._order_manager: BloxrouteOpenbookOrderDataManager = BloxrouteOpenbookOrderDataManager(
             self._provider, self._trading_pairs, self._sol_wallet_public_key
         )
         asyncio.create_task(self._initialize_order_manager())
-
 
         super().__init__(client_config_map)
 
@@ -442,7 +445,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             tokens = token_pair[0].split("/")
             base = tokens[0]
             quote = tokens[1]
-            trading_pair = f"{base}/{quote}"
+            trading_pair = f"{base}-{quote}"
 
             try:
                 mapping[market_name] = trading_pair
@@ -456,7 +459,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return price
 
     async def _update_trading_rules(self):
-        await self._provider.connect()
+        await self._provider.wait_connect()
         markets_response: GetMarketsResponse = await self._provider.get_markets()
         markets_by_name = markets_response.markets
 
