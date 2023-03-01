@@ -75,13 +75,10 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._provider = BloxrouteOpenbookProvider(endpoint=PROVIDER_ENDPOINT, auth_header=self._auth_header,
                                                    private_key=self._sol_wallet_private_key)
 
-        self._token_accounts: Dict[str, str] = {
-            "SOL": "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5",
-            "USDC": "Hse4dWHfnExzZ6mZkfNjs8BW45YZURHsWiHzssDMNjQ8"
-        }
+        self._token_accounts: Dict[str, str] = {}
 
         self._trading_pairs = trading_pairs
-        # asyncio.create_task(self._initialize_token_accounts())
+        asyncio.create_task(self._initialize_token_accounts())
 
         self._order_manager: BloxrouteOpenbookOrderDataManager = BloxrouteOpenbookOrderDataManager(
             self._provider, self._trading_pairs, self._sol_wallet_public_key
