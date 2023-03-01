@@ -94,6 +94,7 @@ class BloxrouteOpenbookOrderDataManager:
             self._order_status_running_tasks.append(initialize_order_stream_task)
 
     async def _poll_order_book_updates(self):
+        await self._provider.wait_connect()
         order_book_stream = self._provider.get_orderbooks_stream(
             markets=self._trading_pairs, limit=5, project=SPOT_OPENBOOK_PROJECT
         )
@@ -102,6 +103,7 @@ class BloxrouteOpenbookOrderDataManager:
             self._apply_order_book_update(order_book_update.orderbook)
 
     async def _poll_order_status_updates(self, trading_pair: str):
+        await self._provider.wait_connect()
         order_status_stream = self._provider.get_order_status_stream(
             market=trading_pair, owner_address=self._owner_address, project=SPOT_OPENBOOK_PROJECT
         )

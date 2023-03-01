@@ -68,7 +68,6 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
         self._provider = BloxrouteOpenbookProvider(endpoint=constants.WS_URL, auth_header=self._auth_header,
                                                    private_key=self._sol_wallet_private_key)
-        asyncio.create_task(self._provider.connect())
 
         self._token_accounts: Dict[str, str] = {
             "SOL": "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5",
@@ -360,7 +359,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return trading_rule.min_base_amount_increment
 
     async def _update_balances(self):
-        await self._provider.connect()
+        await self._provider.wait_connect()
         account_balance: api.GetAccountBalanceResponse = await self._provider.get_account_balance(
             owner_address=self._sol_wallet_public_key
         )
