@@ -1,9 +1,10 @@
-from bxsolana_trader_proto import Project
+import bxsolana.provider.constants as constants
+import bxsolana_trader_proto as proto
 
 EXCHANGE_NAME = "bloxroute_openbook"
-SPOT_OPENBOOK_PROJECT = Project.P_OPENBOOK
+SPOT_OPENBOOK_PROJECT = proto.Project.P_OPENBOOK
 
-WS_URL = "ws://52.29.225.54:1809/ws"  # mainnet
+PROVIDER_ENDPOINT = constants.TESTNET_API_WS
 
 CLIENT_ORDER_ID_MAX_LENGTH = 7
 ORDERBOOK_RETRIES = 2

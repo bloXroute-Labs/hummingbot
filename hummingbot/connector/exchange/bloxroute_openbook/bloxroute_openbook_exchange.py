@@ -15,6 +15,7 @@ from hummingbot.connector.exchange.bloxroute_openbook import (
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_order_book_data_source import (
     BloxrouteOpenbookAPIOrderBookDataSource,
 )
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import PROVIDER_ENDPOINT
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import BloxrouteOpenbookOrderBook
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_data_manager import (
     BloxrouteOpenbookOrderDataManager,
@@ -71,7 +72,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._order_id_mapper: Dict[str, int] = {}  # maps Hummingbot to bloXroute order id
         self._open_orders_address_mapper: Dict[str, str] = {}  # maps trading pair to open orders address
 
-        self._provider = BloxrouteOpenbookProvider(endpoint=constants.WS_URL, auth_header=self._auth_header,
+        self._provider = BloxrouteOpenbookProvider(endpoint=PROVIDER_ENDPOINT, auth_header=self._auth_header,
                                                    private_key=self._sol_wallet_private_key)
 
         self._token_accounts: Dict[str, str] = {
@@ -96,12 +97,17 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         token_account_dict = {token.symbol: token.token_account for token in token_accounts_response.accounts}
 
         for trading_pair in self._trading_pairs:
-            tokens = trading_pair.split("-")
-            for token in tokens:
-                if token not in self._token_accounts:
-                    if token not in token_account_dict:
-                        raise Exception(f"token account for {token} does not exist")
-                    self._token_accounts[token] = token_account_dict[token]
+            possible_splits = [[trading_pair[:3], trading_pair[3:]], [trading_pair[:4], trading_pair[4:]]]
+            found = False
+            for trading_split in possible_splits:
+                for token in trading_split:
+                    if token not in self._token_accounts:
+                        if token not in token_account_dict:
+                            break
+                        self._token_accounts[token] = token_account_dict[token]
+                        found = True
+            if not found:
+                raise Exception(f"could not find token accounts for trading pair {trading_pair}")
 
     async def _initialize_order_manager(self):
         await self._provider.wait_connect()
