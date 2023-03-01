@@ -50,18 +50,18 @@ KEYS = BloXrouteConnectorMap.construct()
 
 
 def trade_type_to_side(trade_type: TradeType) -> api.Side:
-    if trade_type.value == trade_type.BUY:
+    if trade_type == TradeType.BUY:
         return api.Side.S_BID
-    elif trade_type.value == trade_type.SELL:
+    elif trade_type == TradeType.SELL:
         return api.Side.S_ASK
     else:
         return api.Side.S_UNKNOWN
 
 
 def order_type_to_blxr_order_type(order_type: OrderType) -> common.OrderType:
-    if order_type.value == order_type.MARKET:
+    if order_type == OrderType.MARKET:
         return common.OrderType.OT_MARKET
-    elif order_type.value == order_type.LIMIT:
+    elif order_type == OrderType.LIMIT:
         return common.OrderType.OT_LIMIT
     else:
-        raise Exception(f"unknown order type ${order_type.value}")
+        raise Exception(f"unknown order type {order_type.value}")

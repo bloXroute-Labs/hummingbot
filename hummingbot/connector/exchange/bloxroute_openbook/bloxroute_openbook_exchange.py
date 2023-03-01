@@ -8,7 +8,10 @@ from bxsolana.transaction import load_private_key, signing
 from bxsolana_trader_proto import GetMarketsResponse, api
 
 from hummingbot.connector.constants import s_decimal_NaN
-from hummingbot.connector.exchange.bloxroute_openbook import bloxroute_openbook_constants as constants
+from hummingbot.connector.exchange.bloxroute_openbook import (
+    bloxroute_openbook_constants as constants,
+    bloxroute_openbook_web_utils as web_utils,
+)
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_order_book_data_source import (
     BloxrouteOpenbookAPIOrderBookDataSource,
 )
@@ -40,6 +43,8 @@ if TYPE_CHECKING:
 
 
 class BloxrouteOpenbookExchange(ExchangePyBase):
+    web_utils = web_utils
+
     def __init__(
         self,
         client_config_map: "ClientConfigAdapter",
@@ -54,14 +59,14 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         :param trading_pairs: The market trading pairs used for a strategy
         :param trading_required: Whether actual trading is needed
         """
-
         self.logger().info("Creating bloXroute exchange")
 
         self._trading_required = trading_required
         self._auth_header = bloxroute_auth_header
         self._sol_wallet_private_key = solana_wallet_private_key
-        kp = load_private_key(self._sol_wallet_private_key)
-        self._sol_wallet_public_key = str(kp.public_key)
+
+        self._key_pair = load_private_key(self._sol_wallet_private_key)
+        self._sol_wallet_public_key = str(self._key_pair.public_key)
 
         self._order_id_mapper: Dict[str, int] = {}  # maps Hummingbot to bloXroute order id
         self._open_orders_address_mapper: Dict[str, str] = {}  # maps trading pair to open orders address
@@ -188,7 +193,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             return NetworkStatus.NOT_CONNECTED
 
     def get_price(self, trading_pair: str, is_buy: bool) -> Decimal:
-        if self._order_manager.is_ready():
+        if self._order_manager.is_ready:
             price, _ = self._order_manager.get_price_with_opportunity_size(trading_pair=trading_pair, is_buy=is_buy)
             return Decimal(price)
         else:
@@ -271,6 +276,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(order_id)
         self._order_id_mapper[order_id] = blxr_client_order_id
 
+        await self._provider.wait_connect()
         post_order_response = await self._provider.post_order(
             owner_address=self._sol_wallet_public_key,
             payer_address=payer_address,
@@ -284,7 +290,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             project=constants.SPOT_OPENBOOK_PROJECT,
         )
 
-        signed_tx = signing.sign_tx(post_order_response.transaction.content)
+        signed_tx = signing.sign_tx_with_private_key(post_order_response.transaction.content, self._key_pair)
         post_submit_response = await self._provider.post_submit(
             transaction=api.TransactionMessage(content=signed_tx),
             skip_pre_flight=True,
@@ -307,6 +313,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         blxr_client_order_id = self._order_id_mapper[order_id]
         open_orders_address = self._open_orders_address_mapper[tracked_order.trading_pair]
 
+        await self._provider.wait_connect()
         cancel_order_response = await self._provider.submit_cancel_by_client_order_i_d(
             owner_address=self._sol_wallet_public_key,
             market_address=tracked_order.trading_pair,
