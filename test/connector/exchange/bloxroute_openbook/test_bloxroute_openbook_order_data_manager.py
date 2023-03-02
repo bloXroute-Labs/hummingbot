@@ -20,7 +20,6 @@ MANAGER_START_WAIT = 0.01
 
 
 class TestOrderDataManager(aiounittest.AsyncTestCase):
-
     @patch("bxsolana.provider.WsProvider.connect")
     @patch("bxsolana.provider.WsProvider.get_orderbook")
     async def test_initalize_orderbook(self, get_orderbook_mock: AsyncMock, connect_mock: AsyncMock):
@@ -214,8 +213,6 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         time_mock.return_value = 1
 
         provider = BloxrouteOpenbookProvider(endpoint="", auth_header="", private_key=TEST_PRIVATE_KEY)
-        await provider.connect()
-
         os_manager = BloxrouteOpenbookOrderDataManager(provider, ["SOLUSDC", "BTCUSDC"], "OWNER_ADDRESS")
         await os_manager.start()
 
@@ -306,6 +303,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         await os_manager.stop()
 
     @patch("time.time")
+    @patch("bxsolana.provider.WsProvider.connect")
     @patch("bxsolana.provider.WsProvider.get_order_status_stream")
     @patch("bxsolana.provider.WsProvider.get_orderbooks_stream")
     @patch(
@@ -317,6 +315,7 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
         initialize_order_book_mock: AsyncMock,
         orderbook_stream_mock: AsyncMock,
         order_status_stream_mock: AsyncMock,
+        connect_mock: AsyncMock,
         time_mock: AsyncMock
     ):
         order_status_stream_mock.return_value = async_generator_order_status_stream(
