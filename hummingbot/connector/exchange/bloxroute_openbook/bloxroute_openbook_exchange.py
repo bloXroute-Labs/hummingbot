@@ -107,15 +107,17 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         token_account_dict = {token.symbol: token.token_account for token in token_accounts_response.accounts}
 
         for trading_pair in self._trading_pairs:
-            possible_splits = [[trading_pair[:3], trading_pair[3:]], [trading_pair[:4], trading_pair[4:]]]
-            found = False
-            for trading_split in possible_splits:
-                for token in trading_split:
-                    if token not in self._token_accounts:
-                        if token not in token_account_dict:
-                            break
-                        self._token_accounts[token] = token_account_dict[token]
-                        found = True
+            tokens = trading_pair.split("-")
+            if len(tokens) != 2:
+                raise Exception(f"trading pair {trading_pair} does not contain `-` seperator")
+
+            found = True
+            for token in tokens:
+                if token not in self._token_accounts:
+                    if token not in token_account_dict:
+                        found = False
+                        break
+                    self._token_accounts[token] = token_account_dict[token]
             if not found:
                 raise Exception(f"could not find token accounts for trading pair {trading_pair}")
 

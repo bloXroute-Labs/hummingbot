@@ -137,7 +137,8 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
 
             if market == "SOLUSDC":
                 return async_generator_order_status_stream(
-                    [("SOL/USDC", 123, 10, proto.OrderStatus.OS_FILLED, proto.Side.S_ASK, 0.3, 0.2)])
+                    [("SOL/USDC", 123, 10, proto.OrderStatus.OS_FILLED, proto.Side.S_ASK, 0.3, 0.2)]
+                )
             elif market == "BTCUSDC":
                 return async_generator_order_status_stream(
                     [

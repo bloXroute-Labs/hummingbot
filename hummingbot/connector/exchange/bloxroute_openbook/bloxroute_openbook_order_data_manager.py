@@ -23,9 +23,9 @@ class BloxrouteOpenbookOrderDataManager:
         self._provider = provider
         self._owner_address = owner_address
 
-        for index, trading_pair in enumerate(trading_pairs):
-            trading_pairs[index] = normalize_trading_pair(trading_pair)
-        self._trading_pairs = trading_pairs
+        self._trading_pairs = []
+        for trading_pair in trading_pairs:
+            self._trading_pairs.append(normalize_trading_pair(trading_pair))
 
         self._order_books: Dict[str, OrderbookInfo] = {}
         self._markets_to_order_statuses: Dict[str, Dict[int, List[OrderStatusInfo]]] = {}
