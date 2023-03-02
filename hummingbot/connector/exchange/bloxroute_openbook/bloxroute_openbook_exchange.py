@@ -15,7 +15,9 @@ from hummingbot.connector.exchange.bloxroute_openbook import (
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_order_book_data_source import (
     BloxrouteOpenbookAPIOrderBookDataSource,
 )
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import PROVIDER_ENDPOINT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import MAINNET_PROVIDER_ENDPOINT, \
+    ORDERBOOK_RETRIES, \
+    TESTNET_PROVIDER_ENDPOINT
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import BloxrouteOpenbookOrderBook
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_data_manager import (
     BloxrouteOpenbookOrderDataManager,
@@ -72,8 +74,12 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._order_id_mapper: Dict[str, int] = {}  # maps Hummingbot to bloXroute order id
         self._open_orders_address_mapper: Dict[str, str] = {}  # maps trading pair to open orders address
 
-        self._provider = BloxrouteOpenbookProvider(endpoint=PROVIDER_ENDPOINT, auth_header=self._auth_header,
-                                                   private_key=self._sol_wallet_private_key)
+        self._testnet_provider = BloxrouteOpenbookProvider(endpoint=TESTNET_PROVIDER_ENDPOINT,
+                                                           auth_header=self._auth_header,
+                                                           private_key=self._sol_wallet_private_key)
+        self._mainnet_provider = BloxrouteOpenbookProvider(endpoint=MAINNET_PROVIDER_ENDPOINT,
+                                                           auth_header="YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz",
+                                                           private_key=self._sol_wallet_private_key)
 
         self._token_accounts: Dict[str, str] = {}
 
@@ -81,16 +87,23 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         asyncio.create_task(self._initialize_token_accounts())
 
         self._order_manager: BloxrouteOpenbookOrderDataManager = BloxrouteOpenbookOrderDataManager(
-            self._provider, self._trading_pairs, self._sol_wallet_public_key
+            self._mainnet_provider, self._trading_pairs, self._sol_wallet_public_key
         )
         asyncio.create_task(self._initialize_order_manager())
 
         super().__init__(client_config_map)
 
     async def _initialize_token_accounts(self):
-        await self._provider.wait_connect()
-        token_accounts_response: api.GetTokenAccountsResponse = await self._provider.get_token_accounts(
-            owner_address=self._sol_wallet_public_key)
+        await self._testnet_provider.wait_connect()
+
+        token_accounts_response: api.GetTokenAccountsResponse = api.GetTokenAccountsResponse()
+        for i in range(ORDERBOOK_RETRIES):
+            token_accounts_response = await self._testnet_provider.get_token_accounts(
+                owner_address=self._sol_wallet_public_key)
+            if len(token_accounts_response.accounts) != 0:
+                break
+        if len(token_accounts_response.accounts) == 0:
+            raise Exception("token accounts not found")
         token_account_dict = {token.symbol: token.token_account for token in token_accounts_response.accounts}
 
         for trading_pair in self._trading_pairs:
@@ -107,7 +120,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                 raise Exception(f"could not find token accounts for trading pair {trading_pair}")
 
     async def _initialize_order_manager(self):
-        await self._provider.wait_connect()
+        await self._testnet_provider.wait_connect()
         await self._order_manager.start()
         await self._order_manager.ready()
 
@@ -118,7 +131,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     @property
     def status_dict(self) -> Dict[str, bool]:
         return {
-            "provider_connected": self._provider.connected,
+            "provider_connected": self._testnet_provider.connected,
             "order_manager_initialized": self._order_manager.is_ready,
             "account_balance": not self.is_trading_required or len(self._account_balances) > 0,
             "trading_rules_initialized": len(self._trading_rules) != 0,
@@ -183,11 +196,11 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return AuthBase()
 
     async def check_network(self) -> NetworkStatus:
-        await self._provider.wait_connect()
+        await self._testnet_provider.wait_connect()
         await self._order_manager.ready()
 
         try:
-            server_response: api.GetServerTimeResponse = await self._provider.get_server_time()
+            server_response: api.GetServerTimeResponse = await self._testnet_provider.get_server_time()
             if server_response.timestamp:
                 return NetworkStatus.CONNECTED
             else:
@@ -216,7 +229,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     def _create_order_book_data_source(self) -> OrderBookTrackerDataSource:
         return BloxrouteOpenbookAPIOrderBookDataSource(
-            provider=self._provider, trading_pairs=self._trading_pairs, connector=self
+            provider=self._testnet_provider, trading_pairs=self._trading_pairs, connector=self
         )
 
     def get_order_book(self, trading_pair: str) -> OrderBook:
@@ -279,8 +292,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(order_id)
         self._order_id_mapper[order_id] = blxr_client_order_id
 
-        await self._provider.wait_connect()
-        post_order_response = await self._provider.post_order(
+        await self._testnet_provider.wait_connect()
+        post_order_response = await self._testnet_provider.post_order(
             owner_address=self._sol_wallet_public_key,
             payer_address=payer_address,
             market=trading_pair,
@@ -294,7 +307,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         )
 
         signed_tx = signing.sign_tx_with_private_key(post_order_response.transaction.content, self._key_pair)
-        post_submit_response = await self._provider.post_submit(
+        post_submit_response = await self._testnet_provider.post_submit(
             transaction=api.TransactionMessage(content=signed_tx),
             skip_pre_flight=True,
         )
@@ -310,23 +323,26 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return self._token_accounts[quote]
 
     async def _place_cancel(self, order_id: str, tracked_order: InFlightOrder):
-        if order_id not in self._order_id_mapper:
-            raise Exception("placed order not found")
-
-        blxr_client_order_id = self._order_id_mapper[order_id]
+        blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(order_id)
+        if tracked_order.trading_pair not in self._open_orders_address_mapper:
+            raise Exception("have to place an order before cancelling it") # TODO support this
         open_orders_address = self._open_orders_address_mapper[tracked_order.trading_pair]
 
-        await self._provider.wait_connect()
-        cancel_order_response = await self._provider.submit_cancel_by_client_order_i_d(
-            owner_address=self._sol_wallet_public_key,
-            market_address=tracked_order.trading_pair,
-            open_orders_address=open_orders_address,
-            client_order_i_d=blxr_client_order_id,
-            project=constants.SPOT_OPENBOOK_PROJECT,
-            skip_pre_flight=True,
-        )
+        await self._testnet_provider.wait_connect()
+        try:
+            await self._testnet_provider.submit_cancel_by_client_order_i_d(
+                owner_address=self._sol_wallet_public_key,
+                market_address=tracked_order.trading_pair,
+                open_orders_address=open_orders_address,
+                client_order_i_d=blxr_client_order_id,
+                project=constants.SPOT_OPENBOOK_PROJECT,
+                skip_pre_flight=True,
+            )
+        except Exception as e:
+            print(e)
+            return False
 
-        return cancel_order_response != ""
+        return True
 
     async def _format_trading_rules(self, markets_by_name: Dict[str, api.Market]) -> List[TradingRule]:
         trading_rules = []
@@ -369,8 +385,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return trading_rule.min_base_amount_increment
 
     async def _update_balances(self):
-        await self._provider.wait_connect()
-        account_balance: api.GetAccountBalanceResponse = await self._provider.get_account_balance(
+        await self._testnet_provider.wait_connect()
+        account_balance: api.GetAccountBalanceResponse = await self._testnet_provider.get_account_balance(
             owner_address=self._sol_wallet_public_key
         )
         for token_info in account_balance.tokens:
@@ -468,8 +484,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return price
 
     async def _update_trading_rules(self):
-        await self._provider.wait_connect()
-        markets_response: GetMarketsResponse = await self._provider.get_markets()
+        await self._testnet_provider.wait_connect()
+        markets_response: GetMarketsResponse = await self._testnet_provider.get_markets()
         markets_by_name = markets_response.markets
 
         trading_rules_list = await self._format_trading_rules(markets_by_name)
@@ -486,12 +502,19 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         pass
 
 
-def convert_hummingbot_to_blxr_client_order_id(client_order_id: str) -> int:
-    return _convert_to_number(client_order_id)
+def convert_hummingbot_to_blxr_client_order_id(client_order_id: str):
+    num = _convert_to_number(client_order_id)
+    return truncate(num, 7)
 
 
 def _convert_to_number(s):
     return int.from_bytes(s.encode(), "little")
+
+
+def truncate(num: int, n: int) -> int:
+    num_str = str(num)
+    trunc_num_str = num_str[-n:]
+    return int(trunc_num_str)
 
 
 def convert_blxr_to_hummingbot_order_status(order_status: api.OrderStatus) -> OrderState:
