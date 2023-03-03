@@ -7,7 +7,7 @@ import bxsolana_trader_proto.api as api
 
 from hummingbot.client.hummingbot_application import HummingbotApplication
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import (
-    ORDERBOOK_RETRIES,
+    PROVIDER_RETRIES,
     SPOT_OPENBOOK_PROJECT,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import (
@@ -16,6 +16,7 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_b
     OrderStatusInfo,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider import BloxrouteOpenbookProvider
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_utils import retry
 
 
 class BloxrouteOpenbookOrderDataManager:
@@ -72,16 +73,11 @@ class BloxrouteOpenbookOrderDataManager:
     async def _initialize_order_books(self):
         await self._provider.wait_connect()
         for trading_pair in self._trading_pairs:
-            initialized = False
-            for i in range(ORDERBOOK_RETRIES):
-                blxr_orderbook = await self._provider.get_orderbook(market=trading_pair, limit=5, project=SPOT_OPENBOOK_PROJECT)
-                if blxr_orderbook.market != "":
-                    self._apply_order_book_update(blxr_orderbook)
-                    initialized = True
+            blxr_orderbook = await retry(lambda: self._provider.get_orderbook(
+                market=trading_pair, limit=5, project=SPOT_OPENBOOK_PROJECT
+            ), "market", PROVIDER_RETRIES)
 
-                    break
-            if not initialized:
-                raise Exception(f"orderbook for {trading_pair} not initialized successfully")
+            self._apply_order_book_update(blxr_orderbook)
 
     async def _initialize_order_status_streams(self):
         await self._provider.wait_connect()

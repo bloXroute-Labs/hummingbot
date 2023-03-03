@@ -1,14 +1,14 @@
-import math
+import typing
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any, Callable, Coroutine
 
+import betterproto
 import bxsolana_trader_proto.api as api
 import bxsolana_trader_proto.common as common
 from pydantic import Field, SecretStr
 
 from hummingbot.client.config.config_data_types import BaseConnectorConfigMap, ClientFieldData
 from hummingbot.core.data_type.common import OrderType, TradeType
-from hummingbot.core.data_type.in_flight_order import OrderState
 from hummingbot.core.data_type.trade_fee import TradeFeeSchema
 
 EXAMPLE_PAIR = "SOL-USDC"
@@ -65,3 +65,19 @@ def order_type_to_blxr_order_type(order_type: OrderType) -> common.OrderType:
         return common.OrderType.OT_LIMIT
     else:
         raise Exception(f"unknown order type {order_type.value}")
+
+
+T = typing.TypeVar("T")
+
+
+async def retry(f: Callable[..., Coroutine[Any, Any, T]], check_field: str, retries: int) -> T:
+    for i in range(retries):
+        response = await f()
+        if not isinstance(response, betterproto.Message):
+            raise Exception("response does not implement betterproto.Message")
+
+        response_dict = response.to_dict()
+        if check_field in response_dict and response_dict[check_field]:
+            return response
+
+    raise Exception(f"{check_field} not found")

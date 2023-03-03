@@ -10,14 +10,17 @@ from bxsolana_trader_proto import GetMarketsResponse, api
 from hummingbot.connector.constants import s_decimal_NaN
 from hummingbot.connector.exchange.bloxroute_openbook import (
     bloxroute_openbook_constants as constants,
+    bloxroute_openbook_utils as utils,
     bloxroute_openbook_web_utils as web_utils,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_order_book_data_source import (
     BloxrouteOpenbookAPIOrderBookDataSource,
 )
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import MAINNET_PROVIDER_ENDPOINT, \
-    ORDERBOOK_RETRIES, \
-    TESTNET_PROVIDER_ENDPOINT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import (
+    MAINNET_PROVIDER_ENDPOINT,
+    PROVIDER_RETRIES,
+    TESTNET_PROVIDER_ENDPOINT,
+)
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import BloxrouteOpenbookOrderBook
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_data_manager import (
     BloxrouteOpenbookOrderDataManager,
@@ -96,16 +99,10 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     async def _initialize_token_accounts(self):
         await self._testnet_provider.wait_connect()
 
-        token_accounts_response: api.GetTokenAccountsResponse = api.GetTokenAccountsResponse()
-        for i in range(ORDERBOOK_RETRIES):
-            token_accounts_response = await self._testnet_provider.get_token_accounts(
-                owner_address=self._sol_wallet_public_key)
-            if len(token_accounts_response.accounts) != 0:
-                break
-        if len(token_accounts_response.accounts) == 0:
-            raise Exception("token accounts not found")
+        token_accounts_response = await utils.retry(lambda: self._testnet_provider.get_token_accounts(
+            owner_address=self._sol_wallet_public_key
+        ), "accounts", PROVIDER_RETRIES)
         token_account_dict = {token.symbol: token.token_account for token in token_accounts_response.accounts}
-
         for trading_pair in self._trading_pairs:
             tokens = trading_pair.split("-")
             if len(tokens) != 2:
@@ -340,8 +337,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                 project=constants.SPOT_OPENBOOK_PROJECT,
                 skip_pre_flight=True,
             )
-        except Exception as e:
-            print(e)
+        except Exception:
             return False
 
         return True
