@@ -29,6 +29,7 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provide
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_utils import (
     order_type_to_blxr_order_type,
     trade_type_to_side,
+    truncate,
 )
 from hummingbot.connector.exchange_py_base import ExchangePyBase
 from hummingbot.connector.trading_rule import TradingRule
@@ -384,9 +385,9 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     async def _update_balances(self):
         await self._testnet_provider.wait_connect()
-        account_balance: api.GetAccountBalanceResponse = await self._testnet_provider.get_account_balance(
+        account_balance = await utils.retry(lambda: self._testnet_provider.get_account_balance(
             owner_address=self._sol_wallet_public_key
-        )
+        ), "tokens", PROVIDER_RETRIES)
         for token_info in account_balance.tokens:
             symbol = token_info.symbol
             if symbol == "wSOL":
@@ -509,10 +510,6 @@ def _convert_to_number(s):
     return int.from_bytes(s.encode(), "little")
 
 
-def truncate(num: int, n: int) -> int:
-    num_str = str(num)
-    trunc_num_str = num_str[-n:]
-    return int(trunc_num_str)
 
 
 def convert_blxr_to_hummingbot_order_status(order_status: api.OrderStatus) -> OrderState:

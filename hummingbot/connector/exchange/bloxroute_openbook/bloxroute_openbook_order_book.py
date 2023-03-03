@@ -4,6 +4,7 @@ from typing import Dict, List, Optional
 from bxsolana_trader_proto import GetOrderbookResponse, api
 from bxsolana_trader_proto.api import OrderbookItem
 
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_utils import truncate
 from hummingbot.core.data_type.order_book import OrderBook
 from hummingbot.core.data_type.order_book_row import OrderBookRow
 
@@ -50,19 +51,17 @@ class OrderStatusInfo:
 
 class BloxrouteOpenbookOrderBook(OrderBook):
     def apply_orderbook_snapshot(
-        self, msg: Dict[str, any], timestamp: float, metadata: Optional[Dict] = None
+        self, msg: Orderbook, timestamp: float
     ):
-        if msg["orderbook"]:
-            if metadata:
-                msg.update(metadata)
-            orderbook: GetOrderbookResponse = msg["orderbook"]
-            self.apply_snapshot(
-                asks=orders_to_orderbook_rows(orderbook.asks),
-                bids=orders_to_orderbook_rows(orderbook.bids),
-                update_id=int(timestamp),
-            )
-        else:
-            raise Exception(f"orderbook snapshot update did not contain `orderbook` field: {msg}")
+        asks = orders_to_orderbook_rows(msg.asks)
+        bids = orders_to_orderbook_rows(msg.bids)
+        timestamp_int = normalized_timestamp(timestamp)
+
+        self.apply_snapshot(
+            asks=asks,
+            bids=bids,
+            update_id=timestamp_int,
+        )
 
 
 def orders_to_orderbook_rows(orders: List[OrderbookItem]) -> List[OrderBookRow]:
@@ -74,4 +73,13 @@ def orders_to_orderbook_rows(orders: List[OrderbookItem]) -> List[OrderBookRow]:
 
 
 def order_to_orderbook_row(order: OrderbookItem) -> OrderBookRow:
-    return OrderBookRow(price=order.price, amount=order.size, update_id=order.order_i_d)
+    return OrderBookRow(price=order.price, amount=order.size, update_id=truncate(order.client_order_i_d, 7))
+
+
+def normalized_timestamp(num: float) -> int:
+    integer = int(num)
+    if len(str(integer)) <= 7:
+        return integer
+    else:
+        return truncate(integer, 7)
+

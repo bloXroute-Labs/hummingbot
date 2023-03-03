@@ -66,6 +66,11 @@ def order_type_to_blxr_order_type(order_type: OrderType) -> common.OrderType:
     else:
         raise Exception(f"unknown order type {order_type.value}")
 
+# gets the last n digits of a number
+def truncate(num: int, n: int) -> int:
+    num_str = str(num)
+    trunc_num_str = num_str[-n:]
+    return int(trunc_num_str)
 
 T = typing.TypeVar("T")
 
