@@ -2,7 +2,8 @@ import bxsolana.provider.constants as constants
 import bxsolana_trader_proto as proto
 
 EXCHANGE_NAME = "bloxroute_openbook"
-SPOT_OPENBOOK_PROJECT = proto.Project.P_OPENBOOK
+SPOT_ORDERBOOK_PROJECT = proto.Project.P_OPENBOOK
+ORDERBOOK_LIMIT = 5
 
 TESTNET_PROVIDER_ENDPOINT = constants.TESTNET_API_WS
 MAINNET_PROVIDER_ENDPOINT = constants.MAINNET_API_WS

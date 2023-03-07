@@ -284,9 +284,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         quote = tokens[1]
 
         payer_address = self._payer_address(base, quote, blxr_side)
-        open_orders_address = ""
-        if trading_pair in self._open_orders_address_mapper:
-            open_orders_address = self._open_orders_address_mapper[trading_pair]
+        open_orders_address = self._open_orders_address_mapper.get(trading_pair, "")
 
         blxr_client_order_id = convert_hbot_client_order_id(order_id)
         self._order_id_mapper[order_id] = blxr_client_order_id
@@ -302,7 +300,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             price=float(price),
             open_orders_address=open_orders_address,
             client_order_i_d=blxr_client_order_id,
-            project=constants.SPOT_OPENBOOK_PROJECT,
+            project=constants.SPOT_ORDERBOOK_PROJECT,
         )
 
         signed_tx = signing.sign_tx_with_private_key(post_order_response.transaction.content, self._key_pair)
@@ -334,7 +332,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
                 market_address=tracked_order.trading_pair,
                 open_orders_address=open_orders_address,
                 client_order_i_d=blxr_client_order_id,
-                project=constants.SPOT_OPENBOOK_PROJECT,
+                project=constants.SPOT_ORDERBOOK_PROJECT,
                 skip_pre_flight=True,
             )
         except Exception:

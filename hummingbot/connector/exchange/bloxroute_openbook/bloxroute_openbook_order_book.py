@@ -36,18 +36,6 @@ class OrderStatusInfo:
     client_order_i_d: int
     timestamp: float
 
-    def __eq__(self, other: "OrderStatusInfo"):
-        return (
-            self.order_status == other.order_status
-            and self.quantity_released == other.quantity_released
-            and self.quantity_remaining == other.quantity_remaining
-            and self.side == other.side
-            and self.fill_price == other.fill_price
-            and self.order_price == other.order_price
-            and self.client_order_i_d == other.client_order_i_d
-            and self.timestamp == other.timestamp
-        )
-
 
 class BloxrouteOpenbookOrderBook(OrderBook):
     def apply_orderbook_snapshot(

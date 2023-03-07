@@ -7,7 +7,8 @@ import aiounittest
 import bxsolana_trader_proto as proto
 from bxsolana import Provider
 
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import SPOT_OPENBOOK_PROJECT
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import MAINNET_PROVIDER_ENDPOINT, \
+    SPOT_ORDERBOOK_PROJECT, TESTNET_PROVIDER_ENDPOINT
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import OrderStatusInfo
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_data_manager import (
     BloxrouteOpenbookOrderDataManager,
@@ -358,6 +359,45 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
 
         await os_manager.stop()
 
+    async def test_order_status_stream_forreal(self):
+        auth_header = "OWM5ODU1MTMtNjY0Ny00NmFhLWJkMzUtNWE4ODM0N2VlZTU4OmE2MDAxYmJjMzVlZjAyM2QyNzJkZjIxMTNhMTM2NTc0"
+        private_key = "3mvTYCLXLM3e2oucFQCtGbtR4bHkEDAJcSkq45mRVNuP7xtpvS5nGMBsHZYVRNHGqiktoBEBBdcvgGASU1DTodPM"
+        owner_address = "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5"
+        market = "SOLUSDC"
+        side = proto.Side.S_ASK
+        type = proto.common.OrderType.OT_LIMIT
+        amount = 0.01
+        price = 20
+        client_order_id = 6
+
+        provider = BloxrouteOpenbookProvider(
+            endpoint=TESTNET_PROVIDER_ENDPOINT,
+            auth_header=auth_header,
+            private_key=private_key)
+        await provider.wait_connect()
+
+        markets = await provider.get_markets()
+        manager = BloxrouteOpenbookOrderDataManager(provider=provider, trading_pairs=["SOLUSDC", "ETHUSDC"],
+                                                    owner_address=owner_address)
+        await manager.start()
+
+        submit_order_response = await provider.submit_order(
+            owner_address=owner_address,
+            payer_address=owner_address,
+            market=market,
+            side=side,
+            types=[type],
+            amount=float(amount),
+            price=float(price),
+            project=SPOT_ORDERBOOK_PROJECT,
+            client_order_id=client_order_id,
+            skip_pre_flight=True,
+        )
+        print(submit_order_response)
+
+        await asyncio.sleep(10)
+        os = manager.get_order_statuses(trading_pair=market, client_order_id=client_order_id)
+        print(os)
 
 def orders(price_and_sizes: List[Tuple[int, int]]) -> List[proto.OrderbookItem]:
     orderbook_items = []
@@ -388,7 +428,7 @@ async def async_generator_order_status_stream(
 async def start_os_stream(provider: Provider, market: str, owner_address: str, queue: asyncio.Queue):
     await provider.connect()
     os_stream = provider.get_order_status_stream(market=market, owner_address=owner_address,
-                                                 project=SPOT_OPENBOOK_PROJECT)
+                                                 project=SPOT_ORDERBOOK_PROJECT)
     while True:
         up = await os_stream.__anext__()
         queue.put_nowait(up)

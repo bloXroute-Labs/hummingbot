@@ -7,8 +7,8 @@ import bxsolana_trader_proto.api as api
 
 from hummingbot.client.hummingbot_application import HummingbotApplication
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import (
-    PROVIDER_RETRIES,
-    SPOT_OPENBOOK_PROJECT,
+    ORDERBOOK_LIMIT, PROVIDER_RETRIES,
+    SPOT_ORDERBOOK_PROJECT,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import (
     Orderbook,
@@ -47,8 +47,6 @@ class BloxrouteOpenbookOrderDataManager:
         return self._ready.is_set()
 
     async def start(self):
-        await self._start_lock.acquire()
-
         if not self._started.is_set():
             self._started.set()
 
@@ -58,8 +56,6 @@ class BloxrouteOpenbookOrderDataManager:
             await self._initialize_order_status_streams()
 
             self._ready.set()
-
-        self._start_lock.release()
 
     async def stop(self):
         if self._orderbook_polling_task is not None:
@@ -74,7 +70,7 @@ class BloxrouteOpenbookOrderDataManager:
         await self._provider.wait_connect()
         for trading_pair in self._trading_pairs:
             blxr_orderbook = await retry(lambda: self._provider.get_orderbook(
-                market=trading_pair, limit=5, project=SPOT_OPENBOOK_PROJECT
+                market=trading_pair, limit=ORDERBOOK_LIMIT, project=SPOT_ORDERBOOK_PROJECT
             ), "market", PROVIDER_RETRIES)
 
             self._apply_order_book_update(blxr_orderbook)
@@ -92,7 +88,7 @@ class BloxrouteOpenbookOrderDataManager:
     async def _poll_order_book_updates(self):
         await self._provider.wait_connect()
         order_book_stream = self._provider.get_orderbooks_stream(
-            markets=self._trading_pairs, limit=5, project=SPOT_OPENBOOK_PROJECT
+            markets=self._trading_pairs, limit=ORDERBOOK_LIMIT, project=SPOT_ORDERBOOK_PROJECT
         )
 
         async for order_book_update in order_book_stream:
@@ -101,7 +97,7 @@ class BloxrouteOpenbookOrderDataManager:
     async def _poll_order_status_updates(self, trading_pair: str):
         await self._provider.wait_connect()
         order_status_stream = self._provider.get_order_status_stream(
-            market=trading_pair, owner_address=self._owner_address, project=SPOT_OPENBOOK_PROJECT
+            market=trading_pair, owner_address=self._owner_address, project=SPOT_ORDERBOOK_PROJECT
         )
 
         async for order_status_update in order_status_stream:
