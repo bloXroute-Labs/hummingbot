@@ -27,15 +27,14 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_d
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider import BloxrouteOpenbookProvider
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_utils import (
-    order_type_to_blxr_order_type,
-    trade_type_to_side,
-    truncate,
+    convert_blxr_order_status, convert_hbot_client_order_id, convert_hbot_order_type,
+    convert_hbot_trade_type,
 )
 from hummingbot.connector.exchange_py_base import ExchangePyBase
 from hummingbot.connector.trading_rule import TradingRule
 from hummingbot.core.api_throttler.async_throttler import AsyncThrottler
 from hummingbot.core.data_type.common import OrderType, TradeType
-from hummingbot.core.data_type.in_flight_order import InFlightOrder, OrderState, OrderUpdate, TradeUpdate
+from hummingbot.core.data_type.in_flight_order import InFlightOrder, OrderUpdate, TradeUpdate
 from hummingbot.core.data_type.order_book import OrderBook
 from hummingbot.core.data_type.order_book_tracker_data_source import OrderBookTrackerDataSource
 from hummingbot.core.data_type.trade_fee import DeductedFromReturnsTradeFee, TradeFeeBase
@@ -277,8 +276,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         price: Decimal,
         **kwargs,
     ) -> Tuple[str, float]:
-        blxr_order_type = order_type_to_blxr_order_type(order_type)
-        blxr_side = trade_type_to_side(trade_type)
+        blxr_order_type = convert_hbot_order_type(order_type)
+        blxr_side = convert_hbot_trade_type(trade_type)
 
         tokens = trading_pair.split("-")
         base = tokens[0]
@@ -289,7 +288,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         if trading_pair in self._open_orders_address_mapper:
             open_orders_address = self._open_orders_address_mapper[trading_pair]
 
-        blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(order_id)
+        blxr_client_order_id = convert_hbot_client_order_id(order_id)
         self._order_id_mapper[order_id] = blxr_client_order_id
 
         await self._testnet_provider.wait_connect()
@@ -323,7 +322,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return self._token_accounts[quote]
 
     async def _place_cancel(self, order_id: str, tracked_order: InFlightOrder):
-        blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(order_id)
+        blxr_client_order_id = convert_hbot_client_order_id(order_id)
         if tracked_order.trading_pair not in self._open_orders_address_mapper:
             raise Exception("have to place an order before cancelling it") # TODO support this
         open_orders_address = self._open_orders_address_mapper[tracked_order.trading_pair]
@@ -396,7 +395,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             self._account_available_balances[symbol] = Decimal(token_info.settled_amount)
 
     async def _all_trade_updates_for_order(self, order: InFlightOrder) -> List[TradeUpdate]:
-        blxr_client_order_i_d = convert_hummingbot_to_blxr_client_order_id(order.client_order_id)
+        blxr_client_order_i_d = convert_hbot_client_order_id(order.client_order_id)
         order_updates = self._order_manager.get_order_statuses(
             trading_pair=order.trading_pair, client_order_id=blxr_client_order_i_d
         )
@@ -439,7 +438,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         return trade_updates
 
     async def _request_order_status(self, tracked_order: InFlightOrder) -> OrderUpdate:
-        blxr_client_order_id = convert_hummingbot_to_blxr_client_order_id(tracked_order.client_order_id)
+        blxr_client_order_id = convert_hbot_client_order_id(tracked_order.client_order_id)
         order_status_info = self._order_manager.get_order_statuses(
             trading_pair=tracked_order.trading_pair, client_order_id=blxr_client_order_id
         )
@@ -450,7 +449,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
             timestamp = order_status_info[-1].timestamp
             order_status = order_status_info[-1].order_status
 
-        new_order_status = convert_blxr_to_hummingbot_order_status(order_status)
+        new_order_status = convert_blxr_order_status(order_status)
         return OrderUpdate(
             trading_pair=tracked_order.trading_pair,
             update_timestamp=timestamp,
@@ -501,25 +500,5 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         pass
 
 
-def convert_hummingbot_to_blxr_client_order_id(client_order_id: str):
-    num = _convert_to_number(client_order_id)
-    return truncate(num, 7)
 
 
-def _convert_to_number(s):
-    return int.from_bytes(s.encode(), "little")
-
-
-
-
-def convert_blxr_to_hummingbot_order_status(order_status: api.OrderStatus) -> OrderState:
-    if order_status == api.OrderStatus.OS_OPEN:
-        return OrderState.OPEN
-    elif order_status == api.OrderStatus.OS_PARTIAL_FILL:
-        return OrderState.PARTIALLY_FILLED
-    elif order_status == api.OrderStatus.OS_FILLED:
-        return OrderState.FILLED
-    elif order_status == api.OrderStatus.OS_CANCELLED:
-        return OrderState.CANCELED
-    else:
-        return OrderState.PENDING_CREATE
