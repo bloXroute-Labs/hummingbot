@@ -27,7 +27,9 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_d
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider import BloxrouteOpenbookProvider
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_utils import (
-    convert_blxr_order_status, convert_hbot_client_order_id, convert_hbot_order_type,
+    convert_blxr_order_status,
+    convert_hbot_client_order_id,
+    convert_hbot_order_type,
     convert_hbot_trade_type,
 )
 from hummingbot.connector.exchange_py_base import ExchangePyBase
@@ -99,9 +101,9 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     async def _initialize_token_accounts(self):
         await self._testnet_provider.wait_connect()
 
-        token_accounts_response = await utils.retry(lambda: self._testnet_provider.get_token_accounts(
+        token_accounts_response = await self._testnet_provider.get_token_accounts(
             owner_address=self._sol_wallet_public_key
-        ), "accounts", PROVIDER_RETRIES)
+        )
         token_account_dict = {token.symbol: token.token_account for token in token_accounts_response.accounts}
         for trading_pair in self._trading_pairs:
             tokens = trading_pair.split("-")
@@ -382,9 +384,9 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     async def _update_balances(self):
         await self._testnet_provider.wait_connect()
-        account_balance = await utils.retry(lambda: self._testnet_provider.get_account_balance(
+        account_balance = await self._testnet_provider.get_account_balance(
             owner_address=self._sol_wallet_public_key
-        ), "tokens", PROVIDER_RETRIES)
+        )
         for token_info in account_balance.tokens:
             symbol = token_info.symbol
             if symbol == "wSOL":

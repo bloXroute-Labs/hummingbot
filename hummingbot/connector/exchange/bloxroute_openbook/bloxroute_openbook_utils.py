@@ -101,14 +101,10 @@ def truncate(num: int, n: int) -> int:
 T = typing.TypeVar("T")
 
 
-async def retry(f: Callable[..., Coroutine[Any, Any, T]], check_field: str, retries: int) -> T:
+async def retry(f: Callable[..., Coroutine[Any, Any, T]], retries: int) -> T:
     for i in range(retries):
-        response = await f()
-        if not isinstance(response, betterproto.Message):
-            raise Exception("response does not implement betterproto.Message")
+        try:
+            return await f()
+        except Exception as e:
+            print(e)
 
-        response_dict = response.to_dict()
-        if check_field in response_dict and response_dict[check_field]:
-            return response
-
-    raise Exception(f"{check_field} not found")

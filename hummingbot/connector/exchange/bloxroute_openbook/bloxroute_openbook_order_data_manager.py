@@ -7,7 +7,7 @@ import bxsolana_trader_proto.api as api
 
 from hummingbot.client.hummingbot_application import HummingbotApplication
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import (
-    ORDERBOOK_LIMIT, PROVIDER_RETRIES,
+    ORDERBOOK_LIMIT,
     SPOT_ORDERBOOK_PROJECT,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import (
@@ -16,7 +16,6 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_b
     OrderStatusInfo,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_provider import BloxrouteOpenbookProvider
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_utils import retry
 
 
 class BloxrouteOpenbookOrderDataManager:
@@ -69,9 +68,9 @@ class BloxrouteOpenbookOrderDataManager:
     async def _initialize_order_books(self):
         await self._provider.wait_connect()
         for trading_pair in self._trading_pairs:
-            blxr_orderbook = await retry(lambda: self._provider.get_orderbook(
+            blxr_orderbook = await self._provider.get_orderbook(
                 market=trading_pair, limit=ORDERBOOK_LIMIT, project=SPOT_ORDERBOOK_PROJECT
-            ), "market", PROVIDER_RETRIES)
+            )
 
             self._apply_order_book_update(blxr_orderbook)
 
