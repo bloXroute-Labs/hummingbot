@@ -1,9 +1,5 @@
-import typing
 from decimal import Decimal
-from typing import Any, Callable, Coroutine
 
-import betterproto
-import bxsolana_trader_proto.api as api
 import bxsolana_trader_proto.common as common
 from bxsolana_trader_proto import api
 from pydantic import Field, SecretStr
@@ -96,15 +92,3 @@ def truncate(num: int, n: int) -> int:
     num_str = str(num)
     trunc_num_str = num_str[-n:]
     return int(trunc_num_str)
-
-
-T = typing.TypeVar("T")
-
-
-async def retry(f: Callable[..., Coroutine[Any, Any, T]], retries: int) -> T:
-    for i in range(retries):
-        try:
-            return await f()
-        except Exception as e:
-            print(e)
-

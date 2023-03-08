@@ -324,7 +324,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
     async def _place_cancel(self, order_id: str, tracked_order: InFlightOrder):
         blxr_client_order_id = convert_hbot_client_order_id(order_id)
         if tracked_order.trading_pair not in self._open_orders_address_mapper:
-            raise Exception("have to place an order before cancelling it") # TODO support this
+            raise Exception("have to place an order before cancelling it")
         open_orders_address = self._open_orders_address_mapper[tracked_order.trading_pair]
 
         await self._testnet_provider.wait_connect()

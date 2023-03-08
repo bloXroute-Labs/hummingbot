@@ -359,46 +359,6 @@ class TestOrderDataManager(aiounittest.AsyncTestCase):
 
         await os_manager.stop()
 
-    async def test_order_status_stream_forreal(self):
-        auth_header = "OWM5ODU1MTMtNjY0Ny00NmFhLWJkMzUtNWE4ODM0N2VlZTU4OmE2MDAxYmJjMzVlZjAyM2QyNzJkZjIxMTNhMTM2NTc0"
-        private_key = "3mvTYCLXLM3e2oucFQCtGbtR4bHkEDAJcSkq45mRVNuP7xtpvS5nGMBsHZYVRNHGqiktoBEBBdcvgGASU1DTodPM"
-        owner_address = "FFqDwRq8B4hhFKRqx7N1M6Dg6vU699hVqeynDeYJdPj5"
-        market = "SOLUSDC"
-        side = proto.Side.S_ASK
-        type = proto.common.OrderType.OT_LIMIT
-        amount = 0.01
-        price = 20
-        client_order_id = 6
-
-        provider = BloxrouteOpenbookProvider(
-            endpoint=TESTNET_PROVIDER_ENDPOINT,
-            auth_header=auth_header,
-            private_key=private_key)
-        await provider.wait_connect()
-
-        markets = await provider.get_markets()
-        manager = BloxrouteOpenbookOrderDataManager(provider=provider, trading_pairs=["SOLUSDC", "ETHUSDC"],
-                                                    owner_address=owner_address)
-        await manager.start()
-
-        submit_order_response = await provider.submit_order(
-            owner_address=owner_address,
-            payer_address=owner_address,
-            market=market,
-            side=side,
-            types=[type],
-            amount=float(amount),
-            price=float(price),
-            project=SPOT_ORDERBOOK_PROJECT,
-            client_order_id=client_order_id,
-            skip_pre_flight=True,
-        )
-        print(submit_order_response)
-
-        await asyncio.sleep(10)
-        os = manager.get_order_statuses(trading_pair=market, client_order_id=client_order_id)
-        print(os)
-
 def orders(price_and_sizes: List[Tuple[int, int]]) -> List[proto.OrderbookItem]:
     orderbook_items = []
     for price, size in price_and_sizes:
