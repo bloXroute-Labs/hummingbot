@@ -7,7 +7,7 @@ import bxsolana_trader_proto.api as api
 
 from hummingbot.client.hummingbot_application import HummingbotApplication
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import (
-    ORDERBOOK_LIMIT,
+    HUMMINGBOT_LOG_DECIMALS, ORDERBOOK_LIMIT,
     SPOT_ORDERBOOK_PROJECT,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import (
@@ -202,8 +202,8 @@ def log_hummingbot(client_order_id, order_status_info):
     remaining = order_status_info.quantity_remaining
     released = order_status_info.quantity_released
     if order_status_info.side == api.Side.S_BID:
-        remaining = round(remaining / order_status_info.order_price, 3)
-        released = round(released / order_status_info.order_price, 3)
+        remaining = round(remaining / order_status_info.order_price, HUMMINGBOT_LOG_DECIMALS)
+        released = round(released / order_status_info.order_price, HUMMINGBOT_LOG_DECIMALS)
     HummingbotApplication.main_application().notify(
         f"order type {order_status_info.order_status.name} | quantity released: {released} | "
         f"quantity remaining: {remaining} | price:  {order_status_info.order_price} | "
