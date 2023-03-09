@@ -202,8 +202,8 @@ def log_hummingbot(client_order_id, order_status_info):
     remaining = order_status_info.quantity_remaining
     released = order_status_info.quantity_released
     if order_status_info.side == api.Side.S_BID:
-        remaining = round(remaining / order_status_info.order_price, 2)
-        released = round(released / order_status_info.order_price, 2)
+        remaining = round(remaining / order_status_info.order_price, 3)
+        released = round(released / order_status_info.order_price, 3)
     HummingbotApplication.main_application().notify(
         f"order type {order_status_info.order_status.name} | quantity released: {released} | "
         f"quantity remaining: {remaining} | price:  {order_status_info.order_price} | "
