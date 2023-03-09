@@ -10,7 +10,6 @@ from bxsolana_trader_proto import GetMarketsResponse, api
 from hummingbot.connector.constants import s_decimal_NaN
 from hummingbot.connector.exchange.bloxroute_openbook import (
     bloxroute_openbook_constants as constants,
-    bloxroute_openbook_utils as utils,
     bloxroute_openbook_web_utils as web_utils,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_order_book_data_source import (
@@ -18,7 +17,6 @@ from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_ord
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import (
     MAINNET_PROVIDER_ENDPOINT,
-    PROVIDER_RETRIES,
     TESTNET_PROVIDER_ENDPOINT,
 )
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import BloxrouteOpenbookOrderBook
@@ -79,12 +77,14 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._order_id_mapper: Dict[str, int] = {}  # maps Hummingbot to bloXroute order id
         self._open_orders_address_mapper: Dict[str, str] = {}  # maps trading pair to open orders address
 
-        self._testnet_provider = BloxrouteOpenbookProvider(endpoint=TESTNET_PROVIDER_ENDPOINT,
-                                                           auth_header=self._auth_header,
-                                                           private_key=self._sol_wallet_private_key)
-        self._mainnet_provider = BloxrouteOpenbookProvider(endpoint=MAINNET_PROVIDER_ENDPOINT,
-                                                           auth_header="YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz",
-                                                           private_key=self._sol_wallet_private_key)
+        self._testnet_provider = BloxrouteOpenbookProvider(
+            endpoint=TESTNET_PROVIDER_ENDPOINT, auth_header=self._auth_header, private_key=self._sol_wallet_private_key
+        )
+        self._mainnet_provider = BloxrouteOpenbookProvider(
+            endpoint=MAINNET_PROVIDER_ENDPOINT,
+            auth_header="YmUwMjRkZjYtNGJmMy00MDY0LWE4MzAtNjU4MGM3ODhkM2E4OmY1ZWVhZTgxZjcwMzE5NjQ0ZmM3ZDYwNmIxZjg1YTUz",
+            private_key=self._sol_wallet_private_key,
+        )
 
         self._token_accounts: Dict[str, str] = {}
 
@@ -352,8 +352,8 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
             quantity_precision = market.base_decimals
             price_precision = market.quote_decimals
-            min_order_size = Decimal(str(10 ** -quantity_precision))
-            min_quote_amount = Decimal(str(10 ** -price_precision))
+            min_order_size = Decimal(str(10**-quantity_precision))
+            min_quote_amount = Decimal(str(10**-price_precision))
             trading_rules.append(
                 TradingRule(
                     trading_pair=trading_pair,
@@ -384,9 +384,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     async def _update_balances(self):
         await self._testnet_provider.wait_connect()
-        account_balance = await self._testnet_provider.get_account_balance(
-            owner_address=self._sol_wallet_public_key
-        )
+        account_balance = await self._testnet_provider.get_account_balance(owner_address=self._sol_wallet_public_key)
         for token_info in account_balance.tokens:
             symbol = token_info.symbol
             if symbol == "wSOL":
@@ -498,7 +496,3 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
 
     async def _update_trading_fees(self):
         pass
-
-
-
-
