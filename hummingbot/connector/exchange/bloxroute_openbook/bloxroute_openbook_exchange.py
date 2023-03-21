@@ -15,10 +15,7 @@ from hummingbot.connector.exchange.bloxroute_openbook import (
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_api_order_book_data_source import (
     BloxrouteOpenbookAPIOrderBookDataSource,
 )
-from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import (
-    MAINNET_PROVIDER_ENDPOINT,
-)
-
+from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_constants import MAINNET_PROVIDER_ENDPOINT
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_book import BloxrouteOpenbookOrderBook
 from hummingbot.connector.exchange.bloxroute_openbook.bloxroute_openbook_order_data_manager import (
     BloxrouteOpenbookOrderDataManager,
@@ -72,7 +69,7 @@ class BloxrouteOpenbookExchange(ExchangePyBase):
         self._sol_wallet_private_key = solana_wallet_private_key
 
         self._key_pair = load_private_key(self._sol_wallet_private_key)
-        self._sol_wallet_public_key = str(self._key_pair.pubkey())
+        self._sol_wallet_public_key = str(self._key_pair.public_key)
 
         self._order_id_mapper: Dict[str, int] = {}  # maps Hummingbot to bloXroute order id
         self._open_orders_address_mapper: Dict[str, str] = {}  # maps trading pair to open orders address
