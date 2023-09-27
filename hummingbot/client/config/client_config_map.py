@@ -14,7 +14,12 @@ from tabulate import tabulate_formats
 from hummingbot.client.config.config_data_types import BaseClientModel, ClientConfigEnum, ClientFieldData
 from hummingbot.client.config.config_methods import using_exchange as using_exchange_pointer
 from hummingbot.client.config.config_validators import validate_bool, validate_float
-from hummingbot.client.settings import DEFAULT_LOG_FILE_PATH, PMM_SCRIPTS_PATH, AllConnectorSettings
+from hummingbot.client.settings import (
+    DEFAULT_GATEWAY_CERTS_PATH,
+    DEFAULT_LOG_FILE_PATH,
+    PMM_SCRIPTS_PATH,
+    AllConnectorSettings,
+)
 from hummingbot.connector.connector_base import ConnectorBase
 from hummingbot.connector.connector_metrics_collector import (
     DummyMetricsCollector,
@@ -125,6 +130,14 @@ class MQTTBridgeConfigMap(BaseClientModel):
             ),
         ),
     )
+    mqtt_external_events: bool = Field(
+        default=True,
+        client_data=ClientFieldData(
+            prompt=lambda cm: (
+                "Enable/Disable External MQTT Event listener"
+            ),
+        ),
+    )
     mqtt_autostart: bool = Field(
         default=False,
         client_data=ClientFieldData(
@@ -136,6 +149,38 @@ class MQTTBridgeConfigMap(BaseClientModel):
 
     class Config:
         title = "mqtt_bridge"
+
+
+class MarketDataCollectionConfigMap(BaseClientModel):
+    market_data_collection_enabled: bool = Field(
+        default=True,
+        client_data=ClientFieldData(
+            prompt=lambda cm: (
+                "Enable/Disable Market Data Collection"
+            ),
+        ),
+    )
+    market_data_collection_interval: int = Field(
+        default=60,
+        ge=1,
+        client_data=ClientFieldData(
+            prompt=lambda cm: (
+                "Set the market data collection interval in seconds (Default=60)"
+            ),
+        ),
+    )
+    market_data_collection_depth: int = Field(
+        default=20,
+        ge=2,
+        client_data=ClientFieldData(
+            prompt=lambda cm: (
+                "Set the order book collection depth (Default=20)"
+            ),
+        ),
+    )
+
+    class Config:
+        title = "market_data_collection"
 
 
 class ColorConfigMap(BaseClientModel):
@@ -536,7 +581,12 @@ PMM_SCRIPT_MODES = {
 
 
 class GatewayConfigMap(BaseClientModel):
-    gateway_api_host: str = Field(default="localhost")
+    gateway_api_host: str = Field(
+        default="localhost",
+        client_data=ClientFieldData(
+            prompt=lambda cm: "Please enter your Gateway API host",
+        ),
+    )
     gateway_api_port: str = Field(
         default="15888",
         client_data=ClientFieldData(
@@ -548,21 +598,9 @@ class GatewayConfigMap(BaseClientModel):
         title = "gateway"
 
 
-class CertsConfigMap(BaseClientModel):
-    path: str = Field(
-        default="",
-        client_data=ClientFieldData(
-            prompt=lambda cm: "Please enter the path for your certificate files",
-        ),
-    )
-
-    class Config:
-        title = "certs"
-
-
 class GlobalTokenConfigMap(BaseClientModel):
     global_token_name: str = Field(
-        default="USD",
+        default="USDT",
         client_data=ClientFieldData(
             prompt=lambda
                 cm: "What is your default display token? (e.g. USD,EUR,BTC)",
@@ -906,12 +944,13 @@ class ClientConfigMap(BaseClientModel):
                      "\ndefault host to only use localhost"
                      "\nPort need to match the final installation port for Gateway"),
     )
-    certs: CertsConfigMap = Field(
-        default=CertsConfigMap(),
-        description=("Certs Configurations"
-                     "\ndefault: use the client generated certs"
-                     "\nPort need to match the certifactes for Gateway"),
+    certs_path: Path = Field(
+        default=DEFAULT_GATEWAY_CERTS_PATH,
+        client_data=ClientFieldData(
+            prompt=lambda cm: f"Where would you like to save certificates that connect your bot to Gateway? (default '{DEFAULT_GATEWAY_CERTS_PATH}')",
+        ),
     )
+
     anonymized_metrics_mode: Union[tuple(METRICS_MODES.values())] = Field(
         default=AnonymizedMetricsEnabledMode(),
         description="Whether to enable aggregated order and trade data collection",
@@ -988,6 +1027,7 @@ class ClientConfigMap(BaseClientModel):
             ),
         ),
     )
+    market_data_collection: MarketDataCollectionConfigMap = Field(default=MarketDataCollectionConfigMap())
 
     class Config:
         title = "client_config_map"
